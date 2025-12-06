@@ -350,7 +350,7 @@ async function updateUserProgress(userId: string, card: { rarity: string; series
     .eq('user_id', userId);
   
   const ownedInSeries = ownedSeriesCards?.filter(
-    c => (c.card as { series: string }).series === card.series
+    c => Array.isArray(c.card) ? c.card[0]?.series === card.series : (c.card as { series?: string })?.series === card.series
   ).length || 0;
   
   if (ownedInSeries >= (seriesCards?.length || 0)) {
@@ -451,3 +451,4 @@ async function checkForUnlockedCards(userId: string) {
 }
 
 export const dynamic = 'force-dynamic';
+
