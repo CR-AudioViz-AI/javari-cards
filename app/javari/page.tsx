@@ -5,137 +5,63 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bot,
   Send,
-  ChevronLeft,
   Sparkles,
   User,
   Loader2,
+  Lightbulb,
   BookOpen,
   TrendingUp,
   Shield,
-  History,
   HelpCircle,
-  Lightbulb,
+  RefreshCw,
 } from 'lucide-react'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 
 interface Message {
+  id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
 }
 
-const QUICK_PROMPTS = [
-  { icon: TrendingUp, text: 'What cards should I invest in?', category: 'investment' },
-  { icon: Shield, text: 'How do I spot fake cards?', category: 'authentication' },
-  { icon: BookOpen, text: 'Explain PSA grading', category: 'grading' },
-  { icon: History, text: 'Tell me about the T206 Wagner', category: 'history' },
-  { icon: Lightbulb, text: 'Tips for new collectors', category: 'beginner' },
-  { icon: HelpCircle, text: 'When should I grade a card?', category: 'grading' },
+const SUGGESTED_QUESTIONS = [
+  { icon: TrendingUp, text: 'What cards are good investments right now?', category: 'investment' },
+  { icon: Shield, text: 'How do I identify counterfeit cards?', category: 'authentication' },
+  { icon: BookOpen, text: 'Explain the difference between PSA and BGS grading', category: 'grading' },
+  { icon: Sparkles, text: 'What makes the Pikachu Illustrator so valuable?', category: 'history' },
+  { icon: HelpCircle, text: 'Should I grade my 1st Edition Charizard?', category: 'advice' },
+  { icon: Lightbulb, text: 'Best Pokémon sets to invest in for 2025', category: 'investment' },
 ]
 
-const SAMPLE_RESPONSES: Record<string, string> = {
-  'What cards should I invest in?': `Great question! Here are my top investment recommendations for 2024:
-
-**Blue-Chip Investments (Lower Risk):**
-• PSA 10 1st Edition Charizard - Still the king of Pokémon
-• Vintage Jordan rookies (1986 Fleer) - Always in demand
-• Reserved List MTG cards - Can never be reprinted
-
-**Emerging Opportunities:**
-• Modern soccer cards (Mbappe, Haaland)
-• Japanese Pokémon Alt Arts
-• Panini Prizm basketball parallels
-
-**Tips:**
-1. Buy what you love - passion helps you hold through dips
-2. Condition is king - always aim for high grades
-3. Diversify across categories
-4. Be patient - cards are long-term investments
-
-Want me to dive deeper into any of these categories?`,
-
-  'How do I spot fake cards?': `Counterfeit detection is crucial! Here's how to protect yourself:
-
-**The Light Test (Pokémon):**
-Hold the card up to a bright light. Real Pokémon cards have a black layer in the middle that blocks most light. Fakes often let more light through.
-
-**Texture Check:**
-• Real holos have specific patterns you can feel
-• Fakes often have flat or wrong textures
-• Compare to a known authentic card
-
-**Print Quality:**
-• Look for the rosette pattern under magnification
-• Check for consistent font sizes
-• Colors should match reference images
-
-**The Rip Test (Last Resort!):**
-Real cards have a black layer between the front and back. Only do this on worthless cards to practice recognition.
-
-**Red Flags When Buying:**
-🚩 Price too good to be true
-🚩 Seller has no return policy
-🚩 Poor quality photos
-🚩 New account with no history
-
-Would you like specific tips for any card type?`,
-
-  'Explain PSA grading': `PSA (Professional Sports Authenticator) is the most popular grading service. Here's the breakdown:
-
-**The Scale:**
-• PSA 10 (Gem Mint) - Perfect card, commands huge premium
-• PSA 9 (Mint) - Near perfect, minor flaw
-• PSA 8 (NM-MT) - Light wear acceptable
-• PSA 7 and below - Visible wear, lower premiums
-
-**What They Check:**
-1. **Centering** - 60/40 or better for a 10
-2. **Corners** - Must be sharp
-3. **Edges** - No whitening or chips
-4. **Surface** - No scratches, print lines
-
-**Current Costs (2024):**
-• Value tier: ~$25 (up to $499 value)
-• Regular: ~$50 (45 business days)
-• Express: ~$150 (10 business days)
-
-**When to Grade:**
-✅ Card is worth 10x+ grading cost
-✅ You want to sell at premium
-✅ Long-term storage/protection
-✅ Card appears to be 8+ quality
-
-❌ Common cards with low ceiling
-❌ Cards with obvious damage
-❌ Cards you'll play with
-
-Need help deciding if a specific card is worth grading?`,
-}
+const QUICK_ACTIONS = [
+  { label: 'Value my card', icon: TrendingUp },
+  { label: 'Grade advice', icon: Shield },
+  { label: 'Card history', icon: BookOpen },
+  { label: 'Investment tips', icon: Lightbulb },
+]
 
 export default function JavariPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
+      id: '1',
       role: 'assistant',
-      content: `Hey there! 👋 I'm Javari, your AI trading card expert!
+      content: `Hey there! 👋 I'm Javari, your personal trading card expert. I know everything about Pokémon, Magic: The Gathering, sports cards, Yu-Gi-Oh!, and more!
 
-I know everything about Pokémon, Magic: The Gathering, Sports Cards, Yu-Gi-Oh!, and more. I can help you with:
+I can help you with:
+• **Card valuations** and market trends
+• **Grading advice** - PSA, BGS, CGC
+• **Authentication** - spotting fakes
+• **Investment strategies** 
+• **Card history** and fun facts
 
-🔍 **Card Identification & Valuation**
-📊 **Grading Advice** (PSA, BGS, CGC)
-💰 **Investment Strategies**
-🛡️ **Counterfeit Detection**
-📚 **Card History & Trivia**
-🎯 **Collection Building Tips**
-
-What would you like to know today?`,
+What would you like to know about today?`,
       timestamp: new Date(),
     },
   ])
-  const [inputValue, setInputValue] = useState('')
+  const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -151,168 +77,227 @@ What would you like to know today?`,
     if (!content.trim() || isLoading) return
 
     const userMessage: Message = {
+      id: Date.now().toString(),
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
     }
 
-    setMessages((prev) => [...prev, userMessage])
-    setInputValue('')
+    setMessages(prev => [...prev, userMessage])
+    setInput('')
     setIsLoading(true)
 
-    // Simulate API call - in production, this would call /api/javari
-    setTimeout(() => {
-      const response = SAMPLE_RESPONSES[content] || `That's a great question about "${content}"! 
+    try {
+      const response = await fetch('/api/javari', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: content,
+          conversation_history: messages.map(m => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+      })
 
-As your card expert, I'd need a bit more context to give you the best answer. Could you tell me:
+      const data = await response.json()
 
-1. What type of cards are you asking about? (Pokémon, Sports, MTG, etc.)
-2. Are you looking for investment advice, grading tips, or general information?
-3. Do you have a specific budget or goal in mind?
-
-I'm here to help you make the best decisions for your collection! 🎴`
-
-      const assistantMessage: Message = {
+      if (data.success) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.data.message,
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, assistantMessage])
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (error) {
+      console.error('Javari API Error:', error)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response,
+        content: "I apologize, but I'm having trouble connecting right now. Please try again in a moment!",
         timestamp: new Date(),
       }
-
-      setMessages((prev) => [...prev, assistantMessage])
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
       setIsLoading(false)
-    }, 1500)
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    sendMessage(inputValue)
+    sendMessage(input)
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b bg-background/80 backdrop-blur-lg">
-        <div className="flex h-16 items-center justify-between px-6">
-          <div className="flex items-center gap-4">
-            <Link href="/">
-              <Button variant="ghost" size="icon">
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                <Bot className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="font-display font-bold">Javari AI</h1>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  Card Expert Online
-                </p>
-              </div>
+      <header className="border-b bg-card/80 backdrop-blur-lg sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+              <Bot className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="font-display font-bold text-xl">Javari AI</h1>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                Your Trading Card Expert
+              </p>
             </div>
           </div>
-          <Badge variant="secondary" className="gap-1">
-            <Sparkles className="h-3 w-3" />
-            Powered by GPT-4
-          </Badge>
+          <Button variant="ghost" size="sm" onClick={() => setMessages([messages[0]])}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            New Chat
+          </Button>
         </div>
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        <AnimatePresence>
-          {messages.map((message, index) => (
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+          <AnimatePresence>
+            {messages.map((message, index) => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: index * 0.05 }}
+                className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : ''}`}
+              >
+                {message.role === 'assistant' && (
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                    <Bot className="h-5 w-5 text-white" />
+                  </div>
+                )}
+                <div
+                  className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                    message.role === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted'
+                  }`}
+                >
+                  <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-li:my-0">
+                    {message.content.split('\n').map((line, i) => {
+                      // Handle bold text
+                      const parts = line.split(/(\*\*.*?\*\*)/g)
+                      return (
+                        <p key={i} className="my-1">
+                          {parts.map((part, j) => {
+                            if (part.startsWith('**') && part.endsWith('**')) {
+                              return <strong key={j}>{part.slice(2, -2)}</strong>
+                            }
+                            return part
+                          })}
+                        </p>
+                      )
+                    })}
+                  </div>
+                </div>
+                {message.role === 'user' && (
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                    <User className="h-5 w-5 text-white" />
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {/* Loading indicator */}
+          {isLoading && (
             <motion.div
-              key={index}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}
+              className="flex gap-4"
             >
-              {message.role === 'assistant' && (
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center flex-shrink-0">
-                  <Bot className="h-4 w-4 text-white" />
-                </div>
-              )}
-              <Card className={`max-w-2xl ${message.role === 'user' ? 'bg-primary/10' : ''}`}>
-                <CardContent className="p-4">
-                  <div className="prose prose-invert prose-sm max-w-none">
-                    {message.content.split('\n').map((line, i) => (
-                      <p key={i} className="mb-2 last:mb-0">
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-              {message.role === 'user' && (
-                <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-                  <User className="h-4 w-4 text-white" />
-                </div>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex gap-3"
-          >
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-white" />
-            </div>
-            <Card>
-              <CardContent className="p-4 flex items-center gap-2">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                <Bot className="h-5 w-5 text-white" />
+              </div>
+              <div className="bg-muted rounded-2xl px-4 py-3 flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-muted-foreground">Javari is thinking...</span>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+                <span className="text-sm text-muted-foreground">Thinking...</span>
+              </div>
+            </motion.div>
+          )}
 
-        <div ref={messagesEndRef} />
+          {/* Suggested questions (only show at start) */}
+          {messages.length === 1 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="space-y-4"
+            >
+              <p className="text-sm text-muted-foreground text-center">
+                Try asking me about...
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {SUGGESTED_QUESTIONS.map((q, index) => (
+                  <Button
+                    key={index}
+                    variant="outline"
+                    className="justify-start text-left h-auto py-3 px-4"
+                    onClick={() => sendMessage(q.text)}
+                  >
+                    <q.icon className="h-4 w-4 mr-3 flex-shrink-0 text-primary" />
+                    <span className="text-sm">{q.text}</span>
+                  </Button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      {/* Quick Prompts */}
-      {messages.length === 1 && (
-        <div className="px-6 pb-4">
-          <p className="text-sm text-muted-foreground mb-3">Quick questions:</p>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_PROMPTS.map((prompt, index) => (
+      {/* Quick Actions */}
+      <div className="border-t bg-card/80 backdrop-blur-lg">
+        <div className="max-w-4xl mx-auto px-4 py-2">
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {QUICK_ACTIONS.map((action, index) => (
               <Button
                 key={index}
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="gap-2"
-                onClick={() => sendMessage(prompt.text)}
+                className="flex-shrink-0"
+                onClick={() => setInput(action.label)}
               >
-                <prompt.icon className="h-4 w-4" />
-                {prompt.text}
+                <action.icon className="h-3 w-3 mr-1" />
+                {action.label}
               </Button>
             ))}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Input */}
-      <div className="sticky bottom-0 border-t bg-background p-4">
-        <form onSubmit={handleSubmit} className="flex gap-3 max-w-4xl mx-auto">
-          <Input
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Ask Javari anything about cards..."
-            className="flex-1"
-            disabled={isLoading}
-          />
-          <Button type="submit" disabled={isLoading || !inputValue.trim()}>
-            <Send className="h-4 w-4" />
-          </Button>
+      <div className="border-t bg-card sticky bottom-0">
+        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex gap-3">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask Javari anything about trading cards..."
+              disabled={isLoading}
+              className="flex-1"
+            />
+            <Button type="submit" disabled={!input.trim() || isLoading}>
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            Javari is powered by AI and may occasionally make mistakes. Verify important decisions.
+          </p>
         </form>
-        <p className="text-xs text-center text-muted-foreground mt-2">
-          Javari uses AI to provide card expertise. Always verify important decisions.
-        </p>
       </div>
     </div>
   )
