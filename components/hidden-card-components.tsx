@@ -19,6 +19,11 @@ interface HiddenCard {
   xpReward: number;
   creditReward: number;
   isSecret: boolean;
+  discoveryHint?: string;
+  unlockCondition?: string;
+  series?: string;
+  maxSupply?: number;
+  currentSupply?: number;
 }
 
 interface UserCardProgress {
@@ -701,3 +706,4 @@ export type {
   UserCardProgress,
   CardDiscoveryContextType
 };
+
