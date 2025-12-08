@@ -2,17 +2,19 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Check, Sparkles, Zap, Crown, Star } from 'lucide-react';
+import { Check, Sparkles, Zap, Crown, Star, CreditCard } from 'lucide-react';
 
 const plans = [
   {
     name: 'Free',
     price: '$0',
     period: 'forever',
-    description: 'Get started with basic card collecting',
-    priceId: null,
+    description: 'Get started with card collecting',
+    stripePriceId: null,
+    paypalPlanId: null,
+    maxCards: 50,
     features: [
-      '10 free card packs',
+      '50 cards maximum',
       'Basic collection management',
       'Community access',
       'Daily trivia games',
@@ -28,9 +30,11 @@ const plans = [
     period: '/month',
     annualPrice: '$86',
     description: 'For serious card collectors',
-    priceId: 'price_1SVgPr7YeQ1dZTUvOvs6XnxE', // $9/mo Basic
+    stripePriceId: 'price_1SVgPr7YeQ1dZTUvOvs6XnxE',
+    paypalPlanId: 'collector_monthly',
+    maxCards: 500,
     features: [
-      'Unlimited card packs',
+      '500 cards maximum',
       'Advanced collection tools',
       'Trading marketplace access',
       'Exclusive card drops',
@@ -47,15 +51,17 @@ const plans = [
     period: '/month',
     annualPrice: '$278',
     description: 'Ultimate collecting experience',
-    priceId: 'price_1SVgPf7YeQ1dZTUvMqqmj8x4', // $29/mo Pro
+    stripePriceId: 'price_1SVgPf7YeQ1dZTUvMqqmj8x4',
+    paypalPlanId: 'premium_monthly',
+    maxCards: Infinity,
     features: [
+      'Unlimited cards',
       'Everything in Collector',
       'First access to new cards',
       'VIP events & giveaways',
       'Custom card requests',
       'White glove support',
       'API access',
-      'Bulk import/export',
     ],
     cta: 'Go Premium',
     highlighted: false,
@@ -66,29 +72,41 @@ const plans = [
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'paypal'>('stripe');
 
-  const handleSubscribe = async (priceId: string | null, planName: string) => {
-    if (!priceId) {
-      // Free plan - redirect to signup
+  const handleSubscribe = async (plan: typeof plans[0]) => {
+    if (!plan.stripePriceId && !plan.paypalPlanId) {
       window.location.href = '/signup';
       return;
     }
 
-    setLoading(planName);
+    setLoading(plan.name);
 
     try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId }),
-      });
-
-      const data = await response.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert(data.error || 'Failed to start checkout');
+      if (paymentMethod === 'stripe' && plan.stripePriceId) {
+        const response = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceId: plan.stripePriceId }),
+        });
+        const data = await response.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          alert(data.error || 'Failed to start checkout');
+        }
+      } else if (paymentMethod === 'paypal' && plan.paypalPlanId) {
+        const response = await fetch('/api/paypal/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ planId: plan.paypalPlanId }),
+        });
+        const data = await response.json();
+        if (data.approvalUrl) {
+          window.location.href = data.approvalUrl;
+        } else {
+          alert(data.error || 'Failed to start PayPal checkout');
+        }
       }
     } catch (error) {
       console.error('Checkout error:', error);
@@ -126,13 +144,37 @@ export default function PricingPage() {
 
       <main className="max-w-7xl mx-auto px-4 py-16">
         {/* Hero */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Choose Your <span className="text-purple-400">Collection</span> Plan
           </h1>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-8">
             Start collecting digital cards today. Upgrade anytime as your collection grows.
           </p>
+
+          {/* Payment Method Toggle */}
+          <div className="flex items-center justify-center gap-4 mb-6">
+            <span className="text-gray-400 text-sm">Pay with:</span>
+            <div className="flex bg-purple-900/30 rounded-lg p-1">
+              <button
+                onClick={() => setPaymentMethod('stripe')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-2 ${
+                  paymentMethod === 'stripe' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <CreditCard className="w-4 h-4" />
+                Card
+              </button>
+              <button
+                onClick={() => setPaymentMethod('paypal')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  paymentMethod === 'paypal' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                PayPal
+              </button>
+            </div>
+          </div>
 
           {/* Billing Toggle */}
           <div className="flex items-center justify-center gap-4">
@@ -184,7 +226,7 @@ export default function PricingPage() {
                   <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-2">
                   <span className="text-4xl font-bold text-white">
                     {isAnnual && plan.annualPrice ? plan.annualPrice : plan.price}
                   </span>
@@ -192,6 +234,10 @@ export default function PricingPage() {
                     {isAnnual && plan.annualPrice ? '/year' : plan.period}
                   </span>
                 </div>
+
+                <p className="text-purple-300 text-sm mb-4">
+                  {plan.maxCards === Infinity ? 'Unlimited' : `Up to ${plan.maxCards}`} cards
+                </p>
 
                 <p className="text-gray-400 mb-6">{plan.description}</p>
 
@@ -205,7 +251,7 @@ export default function PricingPage() {
                 </ul>
 
                 <button
-                  onClick={() => handleSubscribe(plan.priceId, plan.name)}
+                  onClick={() => handleSubscribe(plan)}
                   disabled={loading === plan.name}
                   className={`w-full py-3 rounded-lg font-medium transition ${
                     plan.highlighted
@@ -220,8 +266,20 @@ export default function PricingPage() {
           })}
         </div>
 
-        {/* FAQ Section */}
-        <div className="mt-24 max-w-3xl mx-auto">
+        {/* No Refunds Policy */}
+        <div className="mt-12 max-w-2xl mx-auto">
+          <div className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-6 text-center">
+            <h3 className="text-white font-semibold mb-2">Our Fair Policy</h3>
+            <p className="text-gray-400 text-sm">
+              Try CravCards free before you subscribe. Paid plans can be cancelled anytime - 
+              your access continues until the end of your billing period. No refunds on subscriptions, 
+              but you keep everything you've collected.
+            </p>
+          </div>
+        </div>
+
+        {/* FAQ */}
+        <div className="mt-16 max-w-3xl mx-auto">
           <h2 className="text-2xl font-bold text-white text-center mb-8">
             Frequently Asked Questions
           </h2>
@@ -229,19 +287,19 @@ export default function PricingPage() {
             {[
               {
                 q: 'Can I change plans later?',
-                a: 'Yes! You can upgrade or downgrade your plan at any time. Changes take effect on your next billing cycle.',
+                a: 'Yes! You can upgrade or downgrade at any time. Changes take effect on your next billing cycle.',
               },
               {
                 q: 'What payment methods do you accept?',
-                a: 'We accept all major credit cards through Stripe. PayPal support coming soon.',
+                a: 'We accept all major credit cards through Stripe, as well as PayPal.',
               },
               {
-                q: 'Is there a free trial?',
-                a: 'Our Free plan lets you try the platform with no time limit. Upgrade when you\'re ready for more features.',
+                q: 'What happens if I reach my card limit?',
+                a: 'You\'ll be prompted to upgrade to continue adding cards. Your existing collection stays safe.',
               },
               {
-                q: 'Do my cards transfer if I cancel?',
-                a: 'Yes, you keep all cards you\'ve collected. You just lose access to premium features until you resubscribe.',
+                q: 'Do I keep my cards if I downgrade?',
+                a: 'Yes, you keep all your cards. You just can\'t add more until you\'re under your new plan\'s limit.',
               },
             ].map((faq) => (
               <div key={faq.q} className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-6">
@@ -257,7 +315,7 @@ export default function PricingPage() {
       <footer className="border-t border-purple-900/30 mt-16 py-8">
         <div className="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
           <p>© 2025 CR AudioViz AI, LLC. All rights reserved.</p>
-          <p className="mt-2">Powered by Javari AI</p>
+          <p className="mt-2">Part of the CRAV ecosystem | <Link href="https://cravbarrels.com" className="text-purple-400 hover:text-purple-300">CravBarrels</Link></p>
         </div>
       </footer>
     </div>
