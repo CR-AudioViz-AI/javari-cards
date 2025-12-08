@@ -121,7 +121,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h1 className="font-display text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                    CardVerse
+                    CravCards
                   </h1>
                   <p className="text-xs text-muted-foreground">Pro Collector</p>
                 </div>
@@ -464,7 +464,7 @@ export default function Dashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Jump into CardVerse features</CardDescription>
+              <CardDescription>Jump into CravCards features</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -498,3 +498,4 @@ export default function Dashboard() {
     </div>
   )
 }
+
