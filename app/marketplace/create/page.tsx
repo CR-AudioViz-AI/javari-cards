@@ -1,20 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import {
-  ArrowLeft,
-  Upload,
-  X,
-  DollarSign,
-  Tag,
-  Image as ImageIcon,
-  AlertCircle,
-  Check,
-  Loader2,
-} from 'lucide-react'
+import { useAuth } from '@/components/AuthProvider'
+import { ArrowLeft, Loader2, AlertCircle, Check, DollarSign, Upload, Tag } from 'lucide-react'
 
 const CATEGORIES = [
   { id: 'pokemon', name: 'Pokémon', emoji: '⚡' },
@@ -27,132 +18,98 @@ const CATEGORIES = [
 ]
 
 const CONDITIONS = [
-  { id: 'mint', name: 'Mint', desc: 'Perfect condition' },
-  { id: 'near_mint', name: 'Near Mint', desc: 'Almost perfect' },
-  { id: 'excellent', name: 'Excellent', desc: 'Light wear' },
-  { id: 'good', name: 'Good', desc: 'Moderate wear' },
-  { id: 'fair', name: 'Fair', desc: 'Heavy wear' },
-  { id: 'poor', name: 'Poor', desc: 'Damaged' },
+  { id: 'mint', name: 'Mint' },
+  { id: 'near_mint', name: 'Near Mint' },
+  { id: 'excellent', name: 'Excellent' },
+  { id: 'good', name: 'Good' },
+  { id: 'fair', name: 'Fair' },
+  { id: 'poor', name: 'Poor' },
 ]
 
 const LISTING_TYPES = [
-  { id: 'sell', name: 'Sell', desc: 'Fixed price sale', icon: DollarSign },
-  { id: 'trade', name: 'Trade', desc: 'Open to trades', icon: Tag },
-  { id: 'auction', name: 'Auction', desc: 'Bidding', icon: Tag },
+  { id: 'sell', name: 'Sell', description: 'Fixed price sale' },
+  { id: 'trade', name: 'Trade', description: 'Looking to trade' },
+  { id: 'auction', name: 'Auction', description: 'Highest bidder wins' },
 ]
 
 export default function CreateListingPage() {
   const router = useRouter()
   const supabase = createClientComponentClient()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { user, loading: authLoading } = useAuth()
   
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: '',
-    condition: '',
-    listing_type: 'sell',
-    price: '',
-    accepts_offers: false,
-    minimum_offer: '',
-    images: [] as string[],
-  })
-
-  // Check auth
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/login?redirect=/marketplace/create')
-        return
-      }
-      setUser(user)
-    }
-    checkUser()
-  }, [supabase, router])
-
-  // Handle image upload
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-    
-    // For now, create object URLs (in production, upload to Supabase Storage)
-    const newImages = Array.from(files).map(file => URL.createObjectURL(file))
-    setFormData(prev => ({
-      ...prev,
-      images: [...prev.images, ...newImages].slice(0, 6) // Max 6 images
-    }))
-  }
-
-  const removeImage = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }))
-  }
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState('pokemon')
+  const [condition, setCondition] = useState('near_mint')
+  const [listingType, setListingType] = useState('sell')
+  const [price, setPrice] = useState('')
+  const [acceptsOffers, setAcceptsOffers] = useState(false)
+  const [imageUrl, setImageUrl] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user) return
+    
     setError('')
-    
-    // Validation
-    if (!formData.title) {
-      setError('Please enter a title')
-      return
-    }
-    if (!formData.category) {
-      setError('Please select a category')
-      return
-    }
-    if (!formData.price || parseFloat(formData.price) <= 0) {
-      setError('Please enter a valid price')
-      return
-    }
-    
-    setLoading(true)
-    
+    setSaving(true)
+
     try {
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('marketplace_listings')
         .insert({
           seller_id: user.id,
-          title: formData.title,
-          description: formData.description,
-          category: formData.category,
-          condition: formData.condition,
-          listing_type: formData.listing_type,
-          price: parseFloat(formData.price),
-          accepts_offers: formData.accepts_offers,
-          minimum_offer: formData.minimum_offer ? parseFloat(formData.minimum_offer) : null,
-          images: formData.images,
+          title,
+          description,
+          category,
+          condition,
+          listing_type: listingType,
+          price: price ? parseFloat(price) : 0,
+          accepts_offers: acceptsOffers,
+          images: imageUrl ? [imageUrl] : [],
           status: 'active',
         })
-        .select()
-        .single()
-      
+
       if (insertError) throw insertError
-      
+
       setSuccess(true)
       setTimeout(() => {
         router.push('/marketplace')
-      }, 2000)
+      }, 1500)
     } catch (err: any) {
-      console.error('Error creating listing:', err)
-      setError(err.message || 'Failed to create listing. Please try again.')
+      setError(err.message || 'Failed to create listing')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+      </div>
+    )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
+        <div className="max-w-2xl mx-auto px-4 text-center pt-20">
+          <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-4">Sign In Required</h1>
+          <p className="text-gray-400 mb-6">You need to be signed in to list a card.</p>
+          <div className="flex items-center justify-center gap-4">
+            <Link href="/auth/login?redirect=/marketplace/create" className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition">
+              Sign In
+            </Link>
+            <Link href="/marketplace" className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg transition">
+              Back
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }
@@ -173,17 +130,16 @@ export default function CreateListingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
-      <div className="max-w-3xl mx-auto px-4">
-        <Link 
-          href="/marketplace"
-          className="inline-flex items-center text-purple-400 hover:text-purple-300 mb-6"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Marketplace
-        </Link>
-
-        <h1 className="text-3xl font-bold text-white mb-2">Create Listing</h1>
-        <p className="text-gray-400 mb-8">List your card for sale or trade</p>
+      <div className="max-w-2xl mx-auto px-4">
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/marketplace" className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition">
+            <ArrowLeft className="w-5 h-5 text-gray-400" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-white">List a Card</h1>
+            <p className="text-gray-400">Create a new marketplace listing</p>
+          </div>
+        </div>
 
         {error && (
           <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-lg flex items-center gap-3 text-red-400">
@@ -193,210 +149,152 @@ export default function CreateListingPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Images */}
-          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-            <label className="block text-sm font-medium text-white mb-4">
-              Photos <span className="text-gray-500">(up to 6)</span>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Title <span className="text-red-400">*</span>
             </label>
-            
-            <div className="grid grid-cols-3 gap-4">
-              {formData.images.map((img, i) => (
-                <div key={i} className="relative aspect-square bg-gray-800 rounded-lg overflow-hidden">
-                  <img src={img} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(i)}
-                    className="absolute top-2 right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              
-              {formData.images.length < 6 && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="aspect-square bg-gray-800 border-2 border-dashed border-gray-700 rounded-lg flex flex-col items-center justify-center hover:border-purple-500 transition"
-                >
-                  <Upload className="w-8 h-8 text-gray-500 mb-2" />
-                  <span className="text-sm text-gray-500">Add Photo</span>
-                </button>
-              )}
-            </div>
-            
             <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleImageUpload}
-              className="hidden"
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g., PSA 10 Charizard VMAX Rainbow"
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+              required
             />
           </div>
 
-          {/* Title & Description */}
-          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">Title *</label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="e.g., PSA 10 Charizard Base Set 1st Edition"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                maxLength={100}
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe your card's condition, history, and any notable details..."
-                rows={4}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                maxLength={2000}
-              />
-            </div>
-          </div>
-
-          {/* Category */}
-          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-            <label className="block text-sm font-medium text-white mb-4">Category *</label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => setFormData({ ...formData, category: cat.id })}
-                  className={`p-3 rounded-lg border text-center transition ${
-                    formData.category === cat.id
-                      ? 'border-purple-500 bg-purple-900/30 text-white'
-                      : 'border-gray-700 hover:border-gray-600 text-gray-400'
+                  onClick={() => setCategory(cat.id)}
+                  className={`p-3 rounded-lg border text-sm font-medium transition ${
+                    category === cat.id
+                      ? 'bg-purple-600 border-purple-500 text-white'
+                      : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
-                  <span className="text-xl">{cat.emoji}</span>
-                  <div className="text-sm mt-1">{cat.name}</div>
+                  <span className="text-lg mr-1">{cat.emoji}</span>
+                  {cat.name}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Condition */}
-          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-            <label className="block text-sm font-medium text-white mb-4">Condition</label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {CONDITIONS.map((cond) => (
-                <button
-                  key={cond.id}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, condition: cond.id })}
-                  className={`p-3 rounded-lg border text-left transition ${
-                    formData.condition === cond.id
-                      ? 'border-purple-500 bg-purple-900/30'
-                      : 'border-gray-700 hover:border-gray-600'
-                  }`}
-                >
-                  <div className={formData.condition === cond.id ? 'text-white' : 'text-gray-300'}>{cond.name}</div>
-                  <div className="text-xs text-gray-500">{cond.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Listing Type */}
-          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
-            <label className="block text-sm font-medium text-white mb-4">Listing Type</label>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Listing Type</label>
             <div className="grid grid-cols-3 gap-3">
               {LISTING_TYPES.map((type) => (
                 <button
                   key={type.id}
                   type="button"
-                  onClick={() => setFormData({ ...formData, listing_type: type.id })}
+                  onClick={() => setListingType(type.id)}
                   className={`p-4 rounded-lg border text-center transition ${
-                    formData.listing_type === type.id
-                      ? 'border-purple-500 bg-purple-900/30'
-                      : 'border-gray-700 hover:border-gray-600'
+                    listingType === type.id
+                      ? 'bg-purple-600 border-purple-500'
+                      : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
                   }`}
                 >
-                  <type.icon className={`w-6 h-6 mx-auto mb-2 ${
-                    formData.listing_type === type.id ? 'text-purple-400' : 'text-gray-500'
-                  }`} />
-                  <div className={formData.listing_type === type.id ? 'text-white' : 'text-gray-300'}>{type.name}</div>
-                  <div className="text-xs text-gray-500">{type.desc}</div>
+                  <div className="font-medium text-white">{type.name}</div>
+                  <div className="text-xs text-gray-400 mt-1">{type.description}</div>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Pricing */}
-          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-white mb-2">Price *</label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                <input
-                  type="number"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  placeholder="0.00"
-                  min="0"
-                  step="0.01"
-                  className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, accepts_offers: !formData.accepts_offers })}
-                className={`w-12 h-6 rounded-full transition ${formData.accepts_offers ? 'bg-purple-600' : 'bg-gray-700'}`}
-              >
-                <div className={`w-5 h-5 bg-white rounded-full transition transform ${formData.accepts_offers ? 'translate-x-6' : 'translate-x-0.5'}`} />
-              </button>
-              <span className="text-gray-300">Accept offers</span>
-            </div>
-
-            {formData.accepts_offers && (
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">Minimum Offer</label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                  <input
-                    type="number"
-                    value={formData.minimum_offer}
-                    onChange={(e) => setFormData({ ...formData, minimum_offer: e.target.value })}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
-                  />
-                </div>
-              </div>
-            )}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Condition</label>
+            <select
+              value={condition}
+              onChange={(e) => setCondition(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
+            >
+              {CONDITIONS.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
           </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 text-white font-bold rounded-xl transition"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <Check className="w-5 h-5" />
-                Create Listing
-              </>
-            )}
-          </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Price <span className="text-red-400">*</span>
+            </label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0.00"
+                step="0.01"
+                min="0"
+                className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="offers"
+              checked={acceptsOffers}
+              onChange={(e) => setAcceptsOffers(e.target.checked)}
+              className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-purple-600 focus:ring-purple-500"
+            />
+            <label htmlFor="offers" className="text-white">Accept offers below asking price</label>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              placeholder="Describe your card in detail..."
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Image URL (optional)</label>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              placeholder="https://..."
+              className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <div className="flex gap-4">
+            <Link
+              href="/marketplace"
+              className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg transition text-center"
+            >
+              Cancel
+            </Link>
+            <button
+              type="submit"
+              disabled={saving || !title || !price}
+              className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-lg transition disabled:opacity-50"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Tag className="w-5 h-5" />
+                  Create Listing
+                </>
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>
