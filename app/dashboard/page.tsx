@@ -119,7 +119,7 @@ export default function DashboardPage() {
           <div className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold text-white">Welcome back!</h1>
-              <p className="text-purple-300">Here's your collection overview</p>
+              <p className="text-purple-300">Here&apos;s your collection overview</p>
             </div>
             <button
               onClick={() => setShowAddCard(true)}
@@ -238,13 +238,14 @@ export default function DashboardPage() {
         </main>
       </div>
 
-      {/* Upgrade Modal */}
-      {showUpgradeModal && (
-        <UpgradeModal 
-          currentTier={userData.tier}
-          onClose={() => setShowUpgradeModal(false)}
-        />
-      )}
+      {/* Upgrade Modal - with all required props */}
+      <UpgradeModal 
+        isOpen={showUpgradeModal}
+        currentTier={userData.tier}
+        currentCount={userData.cardCount}
+        maxAllowed={tierConfig.maxCards === Infinity ? 999999 : tierConfig.maxCards}
+        onClose={() => setShowUpgradeModal(false)}
+      />
 
       {/* Add Card Modal */}
       {showAddCard && (
