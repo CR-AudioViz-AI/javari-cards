@@ -1,5 +1,9 @@
-# Deployment Log
+-e # Deployment Log
 
-Last triggered: 1765242936
+Last triggered: 1765244312
 
-OAuth fix deployed.
+Changes:
+- Global sticky header
+- User auth display
+- Fixed dashboard layout
+- Working Add Cards button
