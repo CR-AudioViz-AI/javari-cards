@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/components/AuthProvider'
 import {
   LayoutDashboard,
   Package,
@@ -14,13 +15,9 @@ import {
   TrendingUp,
   Plus,
   ChevronRight,
-  Star,
   Zap,
-  Clock,
-  Target,
   ShoppingBag,
   Loader2,
-  Bell,
   Settings,
   LogOut,
 } from 'lucide-react'
@@ -31,7 +28,6 @@ interface UserStats {
   achievements: number
   triviaWins: number
   clubsJoined: number
-  recentActivity: any[]
 }
 
 interface RecentCard {
@@ -46,8 +42,8 @@ interface RecentCard {
 export default function DashboardPage() {
   const router = useRouter()
   const supabase = createClientComponentClient()
+  const { user, loading: authLoading, signOut } = useAuth()
   
-  const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<UserStats>({
@@ -56,22 +52,25 @@ export default function DashboardPage() {
     achievements: 0,
     triviaWins: 0,
     clubsJoined: 0,
-    recentActivity: [],
   })
   const [recentCards, setRecentCards] = useState<RecentCard[]>([])
 
   useEffect(() => {
-    const init = async () => {
-      // Get user
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/auth/login')
-        return
-      }
-      
-      setUser(user)
-      
+    if (authLoading) return
+    
+    if (!user) {
+      router.push('/auth/login')
+      return
+    }
+    
+    fetchUserData()
+  }, [user, authLoading, router])
+
+  const fetchUserData = async () => {
+    if (!user) return
+    
+    setLoading(true)
+    try {
       // Get or create profile
       let { data: profile } = await supabase
         .from('profiles')
@@ -98,19 +97,19 @@ export default function DashboardPage() {
       
       // Fetch stats
       await fetchStats(user.id)
-      
+    } catch (error) {
+      console.error('Error fetching user data:', error)
+    } finally {
       setLoading(false)
     }
-    
-    init()
-  }, [supabase, router])
+  }
 
   const fetchStats = async (userId: string) => {
     try {
       // Get cards
-      const { data: cards, count: cardCount } = await supabase
+      const { data: cards } = await supabase
         .from('cards')
-        .select('*', { count: 'exact' })
+        .select('*')
         .eq('user_id', userId)
       
       // Calculate total value
@@ -138,7 +137,6 @@ export default function DashboardPage() {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
         .eq('completed', true)
-        .gt('correct_answers', 5)
       
       // Get clubs joined
       const { count: clubsJoined } = await supabase
@@ -147,29 +145,29 @@ export default function DashboardPage() {
         .eq('user_id', userId)
       
       setStats({
-        totalCards: cardCount || 0,
+        totalCards: cards?.length || 0,
         collectionValue: totalValue,
         achievements: achievementCount || 0,
         triviaWins: triviaWins || 0,
         clubsJoined: clubsJoined || 0,
-        recentActivity: [],
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
     }
   }
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-  }
-
-  if (loading) {
+  // Loading state
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
       </div>
     )
+  }
+
+  // Not logged in - redirect handled by useEffect
+  if (!user) {
+    return null
   }
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Collector'
@@ -212,7 +210,7 @@ export default function DashboardPage() {
               Settings
             </Link>
             <button 
-              onClick={handleSignOut}
+              onClick={signOut}
               className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-900/20 rounded-lg transition"
             >
               <LogOut className="w-5 h-5" />
@@ -347,7 +345,7 @@ export default function DashboardPage() {
                 {recentCards.map((card) => (
                   <Link
                     key={card.id}
-                    href={`/collection`}
+                    href="/collection"
                     className="bg-gray-800/50 rounded-lg p-3 hover:bg-gray-800 transition"
                   >
                     <div className="aspect-[3/4] bg-gray-700 rounded mb-2 overflow-hidden">
