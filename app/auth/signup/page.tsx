@@ -16,8 +16,7 @@ import {
   AlertCircle,
   Loader2,
   User,
-  Check,
-  Gift
+  Check
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,7 +24,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { supabase } from '@/lib/supabase'
 
 const WELCOME_BENEFITS = [
-  'Track unlimited cards across all categories',
+  'Track up to 50 cards free forever',
   'Join exclusive collector clubs',
   'Play trivia and earn XP rewards',
   'Discover hidden achievement cards',
@@ -100,7 +99,6 @@ export default function SignupPage() {
             avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(formData.name)}`,
             level: 1,
             xp: 0,
-            credits: 100, // Welcome bonus
             member_since: new Date().toISOString(),
           })
 
@@ -240,13 +238,13 @@ export default function SignupPage() {
               ))}
             </div>
 
-            {/* Welcome Bonus */}
+            {/* Free Plan Highlight */}
             <div className="p-4 rounded-xl bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30">
               <div className="flex items-center gap-3">
-                <Gift className="h-8 w-8 text-yellow-400" />
+                <Sparkles className="h-8 w-8 text-purple-400" />
                 <div>
-                  <p className="font-semibold text-white">Welcome Bonus!</p>
-                  <p className="text-sm text-slate-300">Get 100 free credits when you sign up</p>
+                  <p className="font-semibold text-white">Start Free, Upgrade Anytime</p>
+                  <p className="text-sm text-slate-300">50 cards free forever • No credit card required</p>
                 </div>
               </div>
             </div>
