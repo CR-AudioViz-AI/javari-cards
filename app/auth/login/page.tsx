@@ -98,7 +98,7 @@ export default function LoginPage() {
               Welcome Back
             </CardTitle>
             <CardDescription className="text-slate-400">
-              Sign in to access your CardVerse collection
+              Sign in to access your CravCards collection
             </CardDescription>
           </CardHeader>
 
