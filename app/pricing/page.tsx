@@ -76,7 +76,7 @@ export default function PricingPage() {
 
   const handleSubscribe = async (plan: typeof plans[0]) => {
     if (!plan.stripePriceId && !plan.paypalPlanId) {
-      window.location.href = '/signup';
+      window.location.href = '/auth/signup';
       return;
     }
 
@@ -87,118 +87,95 @@ export default function PricingPage() {
         const response = await fetch('/api/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priceId: plan.stripePriceId }),
+          body: JSON.stringify({
+            priceId: plan.stripePriceId,
+            mode: 'subscription',
+          }),
         });
         const data = await response.json();
         if (data.url) {
           window.location.href = data.url;
-        } else {
-          alert(data.error || 'Failed to start checkout');
         }
       } else if (paymentMethod === 'paypal' && plan.paypalPlanId) {
-        const response = await fetch('/api/paypal/checkout', {
+        const response = await fetch('/api/paypal/create-subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ planId: plan.paypalPlanId }),
+          body: JSON.stringify({
+            planId: plan.paypalPlanId,
+          }),
         });
         const data = await response.json();
         if (data.approvalUrl) {
           window.location.href = data.approvalUrl;
-        } else {
-          alert(data.error || 'Failed to start PayPal checkout');
         }
       }
     } catch (error) {
-      console.error('Checkout error:', error);
-      alert('Something went wrong. Please try again.');
+      console.error('Subscription error:', error);
     } finally {
       setLoading(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-950 via-purple-950 to-black">
-      {/* Header */}
-      <header className="border-b border-purple-900/30 bg-black/30 backdrop-blur-lg">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="text-3xl">🎴</span>
-              <span className="text-xl font-bold text-purple-400">CravCards</span>
-            </Link>
-            <nav className="hidden md:flex items-center gap-6">
-              <Link href="/collection" className="text-gray-300 hover:text-white transition">Collection</Link>
-              <Link href="/marketplace" className="text-gray-300 hover:text-white transition">Marketplace</Link>
-              <Link href="/trivia" className="text-gray-300 hover:text-white transition">Trivia</Link>
-              <Link href="/pricing" className="text-purple-400 font-medium">Pricing</Link>
-            </nav>
-            <div className="flex items-center gap-3">
-              <Link href="/login" className="text-gray-300 hover:text-white transition">Sign In</Link>
-              <Link href="/signup" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-16">
-        {/* Hero */}
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-12">
+      <div className="max-w-6xl mx-auto px-4">
+        {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-            Choose Your <span className="text-purple-400">Collection</span> Plan
+            Choose Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Plan</span>
           </h1>
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-8">
-            Start collecting digital cards today. Upgrade anytime as your collection grows.
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+            Start free and upgrade as your collection grows. All plans include access to our community and trivia games.
           </p>
-
-          {/* Payment Method Toggle */}
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <span className="text-gray-400 text-sm">Pay with:</span>
-            <div className="flex bg-purple-900/30 rounded-lg p-1">
-              <button
-                onClick={() => setPaymentMethod('stripe')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition flex items-center gap-2 ${
-                  paymentMethod === 'stripe' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <CreditCard className="w-4 h-4" />
-                Card
-              </button>
-              <button
-                onClick={() => setPaymentMethod('paypal')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                  paymentMethod === 'paypal' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                PayPal
-              </button>
-            </div>
-          </div>
-
-          {/* Billing Toggle */}
-          <div className="flex items-center justify-center gap-4">
-            <span className={`text-sm ${!isAnnual ? 'text-white' : 'text-gray-500'}`}>Monthly</span>
-            <button
-              onClick={() => setIsAnnual(!isAnnual)}
-              className={`relative w-14 h-7 rounded-full transition-colors ${
-                isAnnual ? 'bg-purple-600' : 'bg-gray-600'
-              }`}
-            >
-              <span
-                className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-transform ${
-                  isAnnual ? 'translate-x-8' : 'translate-x-1'
-                }`}
-              />
-            </button>
-            <span className={`text-sm ${isAnnual ? 'text-white' : 'text-gray-500'}`}>
-              Annual <span className="text-green-400">(Save 20%)</span>
-            </span>
-          </div>
         </div>
 
-        {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        {/* Billing Toggle */}
+        <div className="flex items-center justify-center gap-4 mb-12">
+          <span className={`text-sm ${!isAnnual ? 'text-white' : 'text-gray-500'}`}>Monthly</span>
+          <button
+            onClick={() => setIsAnnual(!isAnnual)}
+            className={`relative w-14 h-7 rounded-full transition-colors ${
+              isAnnual ? 'bg-purple-600' : 'bg-gray-700'
+            }`}
+          >
+            <div
+              className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-transform ${
+                isAnnual ? 'translate-x-8' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          <span className={`text-sm ${isAnnual ? 'text-white' : 'text-gray-500'}`}>
+            Annual <span className="text-green-400 text-xs ml-1">Save 20%</span>
+          </span>
+        </div>
+
+        {/* Payment Method */}
+        <div className="flex items-center justify-center gap-4 mb-12">
+          <button
+            onClick={() => setPaymentMethod('stripe')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+              paymentMethod === 'stripe'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            <CreditCard className="w-4 h-4" />
+            Credit Card
+          </button>
+          <button
+            onClick={() => setPaymentMethod('paypal')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+              paymentMethod === 'paypal'
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+            }`}
+          >
+            <span className="font-bold text-sm">PayPal</span>
+          </button>
+        </div>
+
+        {/* Plans Grid */}
+        <div className="grid md:grid-cols-3 gap-8">
           {plans.map((plan) => {
             const Icon = plan.icon;
             return (
@@ -206,46 +183,39 @@ export default function PricingPage() {
                 key={plan.name}
                 className={`relative rounded-2xl p-8 ${
                   plan.highlighted
-                    ? 'bg-gradient-to-b from-purple-900/50 to-purple-950/50 border-2 border-purple-500 scale-105'
-                    : 'bg-purple-900/20 border border-purple-700/30'
+                    ? 'bg-gradient-to-b from-purple-900/50 to-pink-900/30 border-2 border-purple-500'
+                    : 'bg-gray-900/50 border border-gray-800'
                 }`}
               >
                 {plan.highlighted && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                    <span className="px-4 py-1 bg-purple-500 text-white text-sm font-medium rounded-full flex items-center gap-1">
-                      <Sparkles className="w-4 h-4" />
-                      Most Popular
-                    </span>
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white text-sm font-medium">
+                    Most Popular
                   </div>
                 )}
 
                 <div className="flex items-center gap-3 mb-4">
-                  <div className={`p-2 rounded-lg ${plan.highlighted ? 'bg-purple-500/30' : 'bg-purple-900/50'}`}>
-                    <Icon className="w-6 h-6 text-purple-400" />
+                  <div className={`p-2 rounded-lg ${plan.highlighted ? 'bg-purple-500/30' : 'bg-gray-800'}`}>
+                    <Icon className={`w-6 h-6 ${plan.highlighted ? 'text-purple-400' : 'text-gray-400'}`} />
                   </div>
                   <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                 </div>
 
-                <div className="mb-2">
+                <div className="mb-4">
                   <span className="text-4xl font-bold text-white">
                     {isAnnual && plan.annualPrice ? plan.annualPrice : plan.price}
                   </span>
-                  <span className="text-gray-400">
+                  <span className="text-gray-500 ml-1">
                     {isAnnual && plan.annualPrice ? '/year' : plan.period}
                   </span>
                 </div>
 
-                <p className="text-purple-300 text-sm mb-4">
-                  {plan.maxCards === Infinity ? 'Unlimited' : `Up to ${plan.maxCards}`} cards
-                </p>
-
                 <p className="text-gray-400 mb-6">{plan.description}</p>
 
                 <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-3">
-                      <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-300 text-sm">{feature}</span>
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-center gap-3 text-gray-300">
+                      <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
+                      {feature}
                     </li>
                   ))}
                 </ul>
@@ -255,69 +225,61 @@ export default function PricingPage() {
                   disabled={loading === plan.name}
                   className={`w-full py-3 rounded-lg font-medium transition ${
                     plan.highlighted
-                      ? 'bg-purple-600 text-white hover:bg-purple-700'
-                      : 'bg-purple-900/50 text-purple-300 hover:bg-purple-900/70 border border-purple-700/50'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
+                      : 'bg-gray-800 hover:bg-gray-700 text-white'
+                  } disabled:opacity-50`}
                 >
-                  {loading === plan.name ? 'Loading...' : plan.cta}
+                  {loading === plan.name ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : (
+                    plan.cta
+                  )}
                 </button>
               </div>
             );
           })}
         </div>
 
-        {/* No Refunds Policy */}
-        <div className="mt-12 max-w-2xl mx-auto">
-          <div className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-6 text-center">
-            <h3 className="text-white font-semibold mb-2">Our Fair Policy</h3>
-            <p className="text-gray-400 text-sm">
-              Try CravCards free before you subscribe. Paid plans can be cancelled anytime - 
-              your access continues until the end of your billing period. No refunds on subscriptions, 
-              but you keep everything you've collected.
-            </p>
+        {/* FAQ Section */}
+        <div className="mt-20 text-center">
+          <h2 className="text-2xl font-bold text-white mb-8">Frequently Asked Questions</h2>
+          <div className="grid md:grid-cols-2 gap-6 text-left max-w-4xl mx-auto">
+            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+              <h3 className="text-white font-semibold mb-2">Can I change plans later?</h3>
+              <p className="text-gray-400 text-sm">Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately.</p>
+            </div>
+            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+              <h3 className="text-white font-semibold mb-2">What payment methods do you accept?</h3>
+              <p className="text-gray-400 text-sm">We accept all major credit cards through Stripe, as well as PayPal for your convenience.</p>
+            </div>
+            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+              <h3 className="text-white font-semibold mb-2">Is there a refund policy?</h3>
+              <p className="text-gray-400 text-sm">Yes, we offer a 30-day money-back guarantee on all paid plans. No questions asked.</p>
+            </div>
+            <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+              <h3 className="text-white font-semibold mb-2">Do credits expire?</h3>
+              <p className="text-gray-400 text-sm">Never! Your credits never expire on paid plans. On free plans, unused credits roll over each month.</p>
+            </div>
           </div>
         </div>
 
-        {/* FAQ */}
-        <div className="mt-16 max-w-3xl mx-auto">
-          <h2 className="text-2xl font-bold text-white text-center mb-8">
-            Frequently Asked Questions
-          </h2>
-          <div className="space-y-4">
-            {[
-              {
-                q: 'Can I change plans later?',
-                a: 'Yes! You can upgrade or downgrade at any time. Changes take effect on your next billing cycle.',
-              },
-              {
-                q: 'What payment methods do you accept?',
-                a: 'We accept all major credit cards through Stripe, as well as PayPal.',
-              },
-              {
-                q: 'What happens if I reach my card limit?',
-                a: 'You\'ll be prompted to upgrade to continue adding cards. Your existing collection stays safe.',
-              },
-              {
-                q: 'Do I keep my cards if I downgrade?',
-                a: 'Yes, you keep all your cards. You just can\'t add more until you\'re under your new plan\'s limit.',
-              },
-            ].map((faq) => (
-              <div key={faq.q} className="bg-purple-900/20 border border-purple-700/30 rounded-lg p-6">
-                <h3 className="font-semibold text-white mb-2">{faq.q}</h3>
-                <p className="text-gray-400 text-sm">{faq.a}</p>
-              </div>
-            ))}
-          </div>
+        {/* CTA */}
+        <div className="mt-16 text-center">
+          <p className="text-gray-400 mb-4">Have questions? We&apos;re here to help.</p>
+          <Link
+            href="/contact"
+            className="text-purple-400 hover:text-purple-300 font-medium"
+          >
+            Contact Support →
+          </Link>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-purple-900/30 mt-16 py-8">
-        <div className="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
-          <p>© 2025 CR AudioViz AI, LLC. All rights reserved.</p>
-          <p className="mt-2">Part of the CRAV ecosystem | <Link href="https://cravbarrels.com" className="text-purple-400 hover:text-purple-300">CravBarrels</Link></p>
-        </div>
-      </footer>
+      </div>
     </div>
   );
 }
