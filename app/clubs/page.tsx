@@ -1,31 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import {
+  Search,
+  Plus,
   Users,
   Crown,
   MapPin,
   Trophy,
-  Target,
   Sparkles,
-  Search,
-  Plus,
-  ChevronRight,
-  Star,
   Shield,
-  Zap,
-  Filter,
   TrendingUp,
+  ChevronRight,
+  Loader2,
+  Lock,
+  Check,
+  Star,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-// Club types with icons and colors
+interface Club {
+  id: string
+  name: string
+  slug: string
+  description: string
+  club_type: string
+  is_private: boolean
+  is_verified: boolean
+  member_count: number
+  banner_emoji: string
+  banner_color: string
+  requirement: string
+  created_at: string
+  owner: {
+    full_name: string
+    avatar_url: string
+  }
+}
+
 const CLUB_TYPES = [
   { id: 'all', name: 'All Clubs', icon: Users, color: 'from-gray-500 to-gray-600' },
   { id: 'braggers', name: 'Braggers', icon: Crown, color: 'from-yellow-500 to-orange-500' },
@@ -36,338 +49,301 @@ const CLUB_TYPES = [
   { id: 'investment', name: 'Investment', icon: TrendingUp, color: 'from-indigo-500 to-purple-500' },
 ]
 
-const FEATURED_CLUBS = [
-  {
-    id: '1',
-    name: 'Braggers Club',
-    slug: 'braggers',
-    description: 'Elite collectors with $10K+ collections. Show off your best pulls and grails.',
-    club_type: 'braggers',
-    member_count: 2847,
-    banner_color: 'from-yellow-600 via-orange-500 to-red-500',
-    icon: '👑',
-    requirement: '$10,000+ collection value',
-    is_verified: true,
-    recent_activity: 'Member shared PSA 10 1st Ed Charizard',
-  },
-  {
-    id: '2',
-    name: 'PSA 10 Hunters',
-    slug: 'psa-10-hunters',
-    description: 'Dedicated to the pursuit of gem mint perfection. Share tips, finds, and grading stories.',
-    club_type: 'grading',
-    member_count: 5621,
-    banner_color: 'from-red-600 via-red-500 to-orange-500',
-    icon: '💎',
-    requirement: 'Own 5+ PSA 10 cards',
-    is_verified: true,
-    recent_activity: 'Discussion: Best cards to submit right now',
-  },
-  {
-    id: '3',
-    name: 'Pokémon Masters',
-    slug: 'pokemon-masters',
-    description: 'The largest Pokémon TCG collecting community. From Base Set to modern.',
-    club_type: 'tcg',
-    member_count: 18432,
-    banner_color: 'from-yellow-500 via-yellow-400 to-orange-400',
-    icon: '⚡',
-    requirement: 'Open to all',
-    is_verified: true,
-    recent_activity: 'New set predictions for 2025',
-  },
-  {
-    id: '4',
-    name: 'MTG Commander Club',
-    slug: 'mtg-commander',
-    description: 'Commander/EDH enthusiasts. Deck building, collecting, and gameplay discussion.',
-    club_type: 'tcg',
-    member_count: 12847,
-    banner_color: 'from-purple-600 via-purple-500 to-pink-500',
-    icon: '⚔️',
-    requirement: 'Open to all',
-    is_verified: true,
-    recent_activity: 'Top 10 undervalued Commander staples',
-  },
-]
-
-const ALL_CLUBS = [
-  ...FEATURED_CLUBS,
-  {
-    id: '5',
-    name: 'Cincinnati Reds Collectors',
-    slug: 'reds-collectors',
-    description: 'Dedicated to Big Red Machine and all Reds baseball cards.',
-    club_type: 'team',
-    member_count: 1832,
-    banner_color: 'from-red-700 to-red-500',
-    icon: '⚾',
-    requirement: 'Open to all',
-    is_verified: false,
-  },
-  {
-    id: '6',
-    name: 'Kentucky Card Collectors',
-    slug: 'kentucky-collectors',
-    description: 'Local collectors from the Bluegrass State. Meetups and trades.',
-    club_type: 'regional',
-    member_count: 847,
-    banner_color: 'from-blue-600 to-blue-400',
-    icon: '🐎',
-    requirement: 'Kentucky residents',
-    is_verified: false,
-  },
-  {
-    id: '7',
-    name: 'Vintage Pre-War Society',
-    slug: 'vintage-prewar',
-    description: 'Collectors of T206, Goudey, and other pre-war treasures.',
-    club_type: 'investment',
-    member_count: 423,
-    banner_color: 'from-amber-700 to-amber-500',
-    icon: '🏛️',
-    requirement: 'Own at least 1 pre-war card',
-    is_verified: true,
-  },
-  {
-    id: '8',
-    name: 'Yu-Gi-Oh! Duelists',
-    slug: 'yugioh-duelists',
-    description: 'Its time to d-d-d-duel! Collectors and players unite.',
-    club_type: 'tcg',
-    member_count: 7234,
-    banner_color: 'from-indigo-600 to-purple-500',
-    icon: '🐉',
-    requirement: 'Open to all',
-    is_verified: true,
-  },
-  {
-    id: '9',
-    name: 'Card Flippers Anonymous',
-    slug: 'card-flippers',
-    description: 'Buy low, sell high. Investment strategies and market analysis.',
-    club_type: 'investment',
-    member_count: 3421,
-    banner_color: 'from-green-600 to-emerald-500',
-    icon: '💰',
-    requirement: 'Open to all',
-    is_verified: false,
-  },
-  {
-    id: '10',
-    name: 'New Collector Support',
-    slug: 'new-collectors',
-    description: 'Welcoming space for beginners. Ask questions, learn the hobby.',
-    club_type: 'newbie',
-    member_count: 9823,
-    banner_color: 'from-cyan-500 to-blue-500',
-    icon: '🌱',
-    requirement: 'Open to all',
-    is_verified: true,
-  },
-]
-
 export default function ClubsPage() {
+  const supabase = createClientComponentClient()
+  
+  const [clubs, setClubs] = useState<Club[]>([])
+  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  const [userClubs, setUserClubs] = useState<string[]>([])
+  
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState('all')
-  const [userClubs] = useState(['1', '3']) // IDs of clubs user has joined
 
-  const filteredClubs = ALL_CLUBS.filter(club => {
-    const matchesSearch = club.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         club.description.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesType = selectedType === 'all' || club.club_type === selectedType
-    return matchesSearch && matchesType
-  })
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      
+      if (user) {
+        // Get user's club memberships
+        const { data: memberships } = await supabase
+          .from('club_members')
+          .select('club_id')
+          .eq('user_id', user.id)
+        
+        setUserClubs(memberships?.map(m => m.club_id) || [])
+      }
+      
+      await fetchClubs()
+    }
+    
+    init()
+  }, [supabase])
+
+  const fetchClubs = async () => {
+    setLoading(true)
+    try {
+      let query = supabase
+        .from('clubs')
+        .select(`
+          *,
+          owner:profiles!owner_id(full_name, avatar_url)
+        `)
+        .eq('is_private', false)
+        .order('member_count', { ascending: false })
+      
+      if (selectedType !== 'all') {
+        query = query.eq('club_type', selectedType)
+      }
+      
+      if (searchQuery) {
+        query = query.ilike('name', `%${searchQuery}%`)
+      }
+      
+      const { data, error } = await query.limit(50)
+      
+      if (error) throw error
+      
+      setClubs(data || [])
+    } catch (error) {
+      console.error('Error fetching clubs:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchClubs()
+  }, [selectedType, searchQuery])
+
+  const joinClub = async (clubId: string) => {
+    if (!user) {
+      window.location.href = '/auth/login?redirect=/clubs'
+      return
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('club_members')
+        .insert({
+          club_id: clubId,
+          user_id: user.id,
+          role: 'member',
+        })
+      
+      if (error) throw error
+      
+      setUserClubs([...userClubs, clubId])
+      
+      // Update member count
+      await supabase.rpc('increment_club_members', { club_id: clubId })
+      
+      // Refresh clubs
+      fetchClubs()
+    } catch (error) {
+      console.error('Error joining club:', error)
+    }
+  }
+
+  const getTypeIcon = (type: string) => {
+    const found = CLUB_TYPES.find(t => t.id === type)
+    return found?.icon || Users
+  }
+
+  const getTypeColor = (type: string) => {
+    const found = CLUB_TYPES.find(t => t.id === type)
+    return found?.color || 'from-gray-500 to-gray-600'
+  }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
+      <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold flex items-center gap-3">
-              <Users className="h-8 w-8 text-primary" />
-              Clubs
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Join communities of collectors who share your passion
-            </p>
+            <h1 className="text-4xl font-bold text-white mb-2">Clubs</h1>
+            <p className="text-gray-400">Join communities of collectors who share your passion</p>
           </div>
-          <Link href="/clubs/create">
-            <Button className="bg-gradient-to-r from-purple-500 to-pink-500">
-              <Plus className="h-4 w-4 mr-2" />
+          
+          {user && (
+            <Link
+              href="/clubs/create"
+              className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-lg transition"
+            >
+              <Plus className="w-5 h-5" />
               Create Club
-            </Button>
-          </Link>
+            </Link>
+          )}
         </div>
 
-        {/* Search and Filters */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search clubs..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {CLUB_TYPES.map((type) => (
-              <Button
-                key={type.id}
-                variant={selectedType === type.id ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedType(type.id)}
-                className="whitespace-nowrap"
-              >
-                <type.icon className="h-4 w-4 mr-1" />
-                {type.name}
-              </Button>
-            ))}
+        {/* Filters */}
+        <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800 mb-8">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search clubs..."
+                className="w-full pl-10 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            {/* Type Filter */}
+            <div className="flex flex-wrap gap-2">
+              {CLUB_TYPES.map((type) => (
+                <button
+                  key={type.id}
+                  onClick={() => setSelectedType(type.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    selectedType === type.id
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  {type.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Featured Clubs */}
-        <section>
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Star className="h-5 w-5 text-yellow-500" />
-            Featured Clubs
-          </h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {FEATURED_CLUBS.map((club, index) => (
-              <motion.div
-                key={club.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
+        {/* Loading */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && clubs.length === 0 && (
+          <div className="text-center py-20 bg-gray-900/30 rounded-2xl border border-gray-800">
+            <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-white mb-2">No Clubs Found</h3>
+            <p className="text-gray-400 mb-6">
+              {searchQuery || selectedType !== 'all'
+                ? 'Try adjusting your filters'
+                : 'Be the first to create a club!'
+              }
+            </p>
+            {user && (
+              <Link
+                href="/clubs/create"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition"
               >
-                <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group">
-                  <div className={`h-24 bg-gradient-to-r ${club.banner_color} relative`}>
-                    <div className="absolute inset-0 bg-black/20" />
-                    <div className="absolute bottom-4 left-4 flex items-center gap-3">
-                      <div className="h-14 w-14 rounded-xl bg-background/90 flex items-center justify-center text-2xl shadow-lg">
-                        {club.icon}
-                      </div>
+                <Plus className="w-5 h-5" />
+                Create a Club
+              </Link>
+            )}
+          </div>
+        )}
+
+        {/* Clubs Grid */}
+        {!loading && clubs.length > 0 && (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {clubs.map((club) => {
+              const TypeIcon = getTypeIcon(club.club_type)
+              const isMember = userClubs.includes(club.id)
+              
+              return (
+                <div
+                  key={club.id}
+                  className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden hover:border-purple-500/50 transition"
+                >
+                  {/* Banner */}
+                  <div className={`h-24 bg-gradient-to-r ${getTypeColor(club.club_type)} flex items-center justify-center`}>
+                    <span className="text-5xl">{club.banner_emoji}</span>
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="p-5">
+                    <div className="flex items-start justify-between mb-3">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-white text-lg">{club.name}</h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-lg font-bold text-white">{club.name}</h3>
                           {club.is_verified && (
-                            <Shield className="h-4 w-4 text-blue-400" />
+                            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                              <Check className="w-3 h-3 text-white" />
+                            </div>
+                          )}
+                          {club.is_private && (
+                            <Lock className="w-4 h-4 text-gray-500" />
                           )}
                         </div>
-                        <p className="text-white/80 text-sm">
-                          {club.member_count.toLocaleString()} members
-                        </p>
+                        <div className="flex items-center gap-2 text-sm text-gray-400">
+                          <TypeIcon className="w-4 h-4" />
+                          <span className="capitalize">{club.club_type}</span>
+                        </div>
                       </div>
+                    </div>
+                    
+                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                      {club.description}
+                    </p>
+                    
+                    {club.requirement && (
+                      <div className="text-xs text-gray-500 mb-4 px-2 py-1 bg-gray-800/50 rounded inline-block">
+                        📋 {club.requirement}
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <Users className="w-4 h-4" />
+                        {club.member_count.toLocaleString()} members
+                      </div>
+                      
+                      {isMember ? (
+                        <Link
+                          href={`/clubs/${club.slug}`}
+                          className="px-4 py-2 bg-purple-600/20 text-purple-400 rounded-lg text-sm font-medium"
+                        >
+                          View Club
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => joinClub(club.id)}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition"
+                        >
+                          Join
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <CardContent className="p-4">
-                    <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                      {club.description}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="text-xs">
-                        {club.requirement}
-                      </Badge>
-                      {userClubs.includes(club.id) ? (
-                        <Badge variant="secondary">Joined</Badge>
-                      ) : (
-                        <Button size="sm" variant="outline" className="group-hover:bg-primary group-hover:text-primary-foreground">
-                          Join Club
-                        </Button>
-                      )}
-                    </div>
-                    {club.recent_activity && (
-                      <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1">
-                        <Zap className="h-3 w-3" />
-                        {club.recent_activity}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                </div>
+              )
+            })}
           </div>
-        </section>
+        )}
 
-        {/* All Clubs */}
-        <section>
-          <h2 className="text-xl font-semibold mb-4">
-            {selectedType === 'all' ? 'All Clubs' : CLUB_TYPES.find(t => t.id === selectedType)?.name}
-            <span className="text-muted-foreground font-normal ml-2">
-              ({filteredClubs.length})
-            </span>
-          </h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredClubs.map((club, index) => (
-              <motion.div
-                key={club.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${club.banner_color} flex items-center justify-center text-xl flex-shrink-0`}>
-                        {club.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold truncate">{club.name}</h3>
-                          {club.is_verified && (
-                            <Shield className="h-3 w-3 text-blue-400 flex-shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {club.member_count.toLocaleString()} members
-                        </p>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-3 line-clamp-2">
-                      {club.description}
-                    </p>
-                    <div className="flex items-center justify-between mt-4">
-                      <Badge variant="outline" className="text-xs">
-                        {club.requirement}
-                      </Badge>
-                      {userClubs.includes(club.id) ? (
-                        <Badge variant="secondary" className="text-xs">Member</Badge>
-                      ) : (
-                        <Button size="sm" variant="ghost" className="text-xs">
-                          Join
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
-        </section>
-
-        {/* Create Club CTA */}
-        <Card className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-purple-500/30">
-          <CardContent className="p-8 text-center">
-            <Crown className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold mb-2">Start Your Own Club</h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Create a community around your favorite team, player, set, or collecting style. 
-              Lead discussions, organize meetups, and build your collector network.
+        {/* Create CTA */}
+        {!user && (
+          <div className="mt-12 text-center bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-2xl p-8 border border-purple-500/30">
+            <Crown className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-white mb-2">Start Your Own Club</h3>
+            <p className="text-gray-400 mb-6 max-w-md mx-auto">
+              Create a community around your favorite team, player, set, or collecting style.
             </p>
-            <Link href="/clubs/create">
-              <Button size="lg" className="bg-gradient-to-r from-purple-500 to-pink-500">
-                <Plus className="h-5 w-5 mr-2" />
-                Create Your Club
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+            <div className="flex items-center justify-center gap-4">
+              <Link
+                href="/auth/signup"
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition"
+              >
+                Get Started Free
+              </Link>
+              <Link
+                href="/auth/login"
+                className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg transition"
+              >
+                Sign In
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
-
-
