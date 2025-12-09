@@ -1,369 +1,563 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import {
-  Layers,
+  Search,
+  Plus,
   Grid3X3,
   List,
   Filter,
-  Search,
-  Plus,
-  SortAsc,
-  SortDesc,
-  TrendingUp,
-  TrendingDown,
-  MoreVertical,
-  Edit,
+  ChevronDown,
+  Loader2,
+  FolderOpen,
+  Edit3,
   Trash2,
   Eye,
-  Tag,
-  Calendar,
   DollarSign,
-  Star,
-  ChevronLeft,
+  Tag,
+  TrendingUp,
+  Package,
+  MoreVertical,
+  Upload,
+  Camera,
 } from 'lucide-react'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
 
-// Sample cards data
-const SAMPLE_CARDS = [
-  {
-    id: '1',
-    name: '1st Edition Charizard',
-    set_name: 'Base Set',
-    card_number: '4/102',
-    year: 1999,
-    category: 'pokemon',
-    rarity: 'legendary',
-    grading_company: 'PSA',
-    grade: 9,
-    purchase_price: 8500,
-    current_value: 12500,
-    image: '🔥',
-  },
-  {
-    id: '2',
-    name: 'Black Lotus',
-    set_name: 'Alpha',
-    card_number: null,
-    year: 1993,
-    category: 'mtg',
-    rarity: 'mythic',
-    grading_company: 'BGS',
-    grade: 8.5,
-    purchase_price: 6000,
-    current_value: 8900,
-    image: '🌸',
-  },
-  {
-    id: '3',
-    name: 'Mickey Mantle',
-    set_name: '1952 Topps',
-    card_number: '#311',
-    year: 1952,
-    category: 'sports',
-    rarity: 'legendary',
-    grading_company: 'PSA',
-    grade: 6,
-    purchase_price: 5500,
-    current_value: 7200,
-    image: '⚾',
-  },
-  {
-    id: '4',
-    name: 'Blue-Eyes White Dragon',
-    set_name: 'LOB-001',
-    card_number: 'LOB-001',
-    year: 2002,
-    category: 'yugioh',
-    rarity: 'rare',
-    grading_company: 'PSA',
-    grade: 10,
-    purchase_price: 2800,
-    current_value: 4500,
-    image: '🐉',
-  },
-  {
-    id: '5',
-    name: 'LeBron James RC',
-    set_name: '2003 Topps Chrome',
-    card_number: '#111',
-    year: 2003,
-    category: 'sports',
-    rarity: 'epic',
-    grading_company: 'PSA',
-    grade: 10,
-    purchase_price: 2200,
-    current_value: 3800,
-    image: '🏀',
-  },
-  {
-    id: '6',
-    name: 'Pikachu VMAX',
-    set_name: 'Vivid Voltage',
-    card_number: '188/185',
-    year: 2020,
-    category: 'pokemon',
-    rarity: 'rare',
-    grading_company: null,
-    grade: null,
-    purchase_price: 150,
-    current_value: 280,
-    image: '⚡',
-  },
-]
+interface Card {
+  id: string
+  name: string
+  category: string
+  set_name: string
+  card_number: string
+  year: number
+  image_url: string
+  rarity: string
+  condition: string
+  is_graded: boolean
+  grading_company: string
+  grade: number
+  purchase_price: number
+  current_value: number
+  quantity: number
+  created_at: string
+}
+
+interface CollectionStats {
+  totalCards: number
+  totalValue: number
+  avgValue: number
+  categories: Record<string, number>
+}
 
 const CATEGORIES = [
-  { id: 'all', name: 'All Cards', icon: '🎴' },
-  { id: 'pokemon', name: 'Pokémon', icon: '⚡' },
-  { id: 'mtg', name: 'Magic', icon: '✨' },
-  { id: 'sports', name: 'Sports', icon: '🏆' },
-  { id: 'yugioh', name: 'Yu-Gi-Oh!', icon: '🐉' },
+  { id: 'all', name: 'All Categories' },
+  { id: 'pokemon', name: 'Pokémon' },
+  { id: 'sports', name: 'Sports' },
+  { id: 'mtg', name: 'MTG' },
+  { id: 'yugioh', name: 'Yu-Gi-Oh!' },
+  { id: 'disney', name: 'Disney' },
+  { id: 'other', name: 'Other' },
+]
+
+const SORT_OPTIONS = [
+  { id: 'newest', name: 'Recently Added' },
+  { id: 'oldest', name: 'Oldest First' },
+  { id: 'value-high', name: 'Highest Value' },
+  { id: 'value-low', name: 'Lowest Value' },
+  { id: 'name', name: 'Name A-Z' },
 ]
 
 export default function CollectionPage() {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const router = useRouter()
+  const supabase = createClientComponentClient()
+  
+  const [user, setUser] = useState<any>(null)
+  const [cards, setCards] = useState<Card[]>([])
+  const [stats, setStats] = useState<CollectionStats>({
+    totalCards: 0,
+    totalValue: 0,
+    avgValue: 0,
+    categories: {},
+  })
+  const [loading, setLoading] = useState(true)
+  
+  // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [sortBy, setSortBy] = useState('value')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [category, setCategory] = useState('all')
+  const [sortBy, setSortBy] = useState('newest')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  
+  // Modal
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null)
 
-  const filteredCards = SAMPLE_CARDS
-    .filter(card => 
-      (selectedCategory === 'all' || card.category === selectedCategory) &&
-      (card.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-       card.set_name.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
-    .sort((a, b) => {
-      const multiplier = sortOrder === 'desc' ? -1 : 1
-      if (sortBy === 'value') return (a.current_value - b.current_value) * multiplier
-      if (sortBy === 'name') return a.name.localeCompare(b.name) * multiplier
-      if (sortBy === 'grade') return ((a.grade || 0) - (b.grade || 0)) * multiplier
-      return 0
-    })
-
-  const totalValue = SAMPLE_CARDS.reduce((sum, card) => sum + card.current_value, 0)
-  const totalInvested = SAMPLE_CARDS.reduce((sum, card) => sum + card.purchase_price, 0)
-  const totalProfit = totalValue - totalInvested
-  const roi = ((totalProfit / totalInvested) * 100).toFixed(1)
-
-  const getRarityClass = (rarity: string) => {
-    const classes: Record<string, string> = {
-      common: 'border-gray-500/30',
-      uncommon: 'border-green-500/30',
-      rare: 'border-blue-500/30',
-      epic: 'border-purple-500/30',
-      legendary: 'border-yellow-500/30 shadow-lg shadow-yellow-500/10',
-      mythic: 'border-red-500/30 shadow-lg shadow-red-500/10',
+  // Check auth and fetch cards
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        // Show public collection view or redirect
+        setLoading(false)
+        return
+      }
+      
+      setUser(user)
+      await fetchCards(user.id)
     }
-    return classes[rarity] || ''
+    
+    init()
+  }, [supabase])
+
+  const fetchCards = async (userId: string) => {
+    setLoading(true)
+    try {
+      let query = supabase
+        .from('cards')
+        .select('*')
+        .eq('user_id', userId)
+      
+      // Apply category filter
+      if (category !== 'all') {
+        query = query.eq('category', category)
+      }
+      
+      // Apply search
+      if (searchQuery) {
+        query = query.ilike('name', `%${searchQuery}%`)
+      }
+      
+      // Apply sorting
+      switch (sortBy) {
+        case 'oldest':
+          query = query.order('created_at', { ascending: true })
+          break
+        case 'value-high':
+          query = query.order('current_value', { ascending: false, nullsFirst: false })
+          break
+        case 'value-low':
+          query = query.order('current_value', { ascending: true, nullsFirst: false })
+          break
+        case 'name':
+          query = query.order('name', { ascending: true })
+          break
+        default:
+          query = query.order('created_at', { ascending: false })
+      }
+      
+      const { data, error } = await query
+      
+      if (error) throw error
+      
+      setCards(data || [])
+      
+      // Calculate stats
+      if (data && data.length > 0) {
+        const totalValue = data.reduce((sum, c) => sum + (c.current_value || 0), 0)
+        const categories: Record<string, number> = {}
+        data.forEach(c => {
+          categories[c.category] = (categories[c.category] || 0) + 1
+        })
+        
+        setStats({
+          totalCards: data.length,
+          totalValue,
+          avgValue: totalValue / data.length,
+          categories,
+        })
+      } else {
+        setStats({ totalCards: 0, totalValue: 0, avgValue: 0, categories: {} })
+      }
+    } catch (error) {
+      console.error('Error fetching cards:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Re-fetch when filters change
+  useEffect(() => {
+    if (user) {
+      fetchCards(user.id)
+    }
+  }, [category, sortBy, searchQuery])
+
+  const deleteCard = async (cardId: string) => {
+    if (!confirm('Are you sure you want to delete this card?')) return
+    
+    try {
+      const { error } = await supabase
+        .from('cards')
+        .delete()
+        .eq('id', cardId)
+        .eq('user_id', user.id)
+      
+      if (error) throw error
+      
+      setCards(cards.filter(c => c.id !== cardId))
+      setSelectedCard(null)
+    } catch (error) {
+      console.error('Error deleting card:', error)
+    }
+  }
+
+  // Not logged in view
+  if (!loading && !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
+        <div className="max-w-4xl mx-auto px-4 text-center">
+          <Package className="w-20 h-20 text-gray-600 mx-auto mb-6" />
+          <h1 className="text-3xl font-bold text-white mb-4">Your Collection Awaits</h1>
+          <p className="text-gray-400 mb-8 max-w-lg mx-auto">
+            Sign in to start building your card collection. Track values, organize by category, and showcase your best finds.
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <Link
+              href="/auth/signup"
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition"
+            >
+              Get Started Free
+            </Link>
+            <Link
+              href="/auth/login"
+              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg transition"
+            >
+              Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-4">
-          <Link href="/">
-            <Button variant="ghost" size="icon">
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
+      <div className="max-w-7xl mx-auto px-4">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-display font-bold">My Collection</h1>
-            <p className="text-muted-foreground">{SAMPLE_CARDS.length} cards • ${totalValue.toLocaleString()} total value</p>
+            <h1 className="text-3xl font-bold text-white mb-1">My Collection</h1>
+            <p className="text-gray-400">Manage and organize your card collection</p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <Link
+              href="/collection/add"
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
+            >
+              <Plus className="w-5 h-5" />
+              Add Card
+            </Link>
+            <Link
+              href="/collection/import"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition"
+            >
+              <Upload className="w-5 h-5" />
+              Import
+            </Link>
+            <Link
+              href="/collection/scan"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition"
+            >
+              <Camera className="w-5 h-5" />
+              Scan
+            </Link>
           </div>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Card
-        </Button>
-      </div>
 
-      {/* Stats Row */}
-      <div className="grid gap-4 md:grid-cols-4 mb-8">
-        {[
-          { label: 'Total Value', value: `$${totalValue.toLocaleString()}`, icon: DollarSign, color: 'from-green-500 to-emerald-500' },
-          { label: 'Total Invested', value: `$${totalInvested.toLocaleString()}`, icon: Tag, color: 'from-blue-500 to-cyan-500' },
-          { label: 'Total Profit', value: `$${totalProfit.toLocaleString()}`, icon: TrendingUp, color: 'from-purple-500 to-pink-500' },
-          { label: 'ROI', value: `${roi}%`, icon: Star, color: 'from-yellow-500 to-orange-500' },
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className={`h-10 w-10 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
-                  <stat.icon className="h-5 w-5 text-white" />
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-gray-900/50 rounded-xl p-4 border border-purple-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <Package className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-white">{stats.totalCards}</div>
+                <div className="text-sm text-gray-400">Total Cards</div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-900/50 rounded-xl p-4 border border-green-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-500/20 rounded-lg">
+                <DollarSign className="w-5 h-5 text-green-400" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-white">${stats.totalValue.toLocaleString()}</div>
+                <div className="text-sm text-gray-400">Total Value</div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-900/50 rounded-xl p-4 border border-blue-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-white">${stats.avgValue.toFixed(0)}</div>
+                <div className="text-sm text-gray-400">Avg Value</div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-900/50 rounded-xl p-4 border border-amber-500/20">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500/20 rounded-lg">
+                <FolderOpen className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-white">{Object.keys(stats.categories).length}</div>
+                <div className="text-sm text-gray-400">Categories</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search your cards..."
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            {/* Category */}
+            <div className="relative">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="appearance-none px-4 py-2.5 pr-10 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+              >
+                {CATEGORIES.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            </div>
+
+            {/* Sort */}
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="appearance-none px-4 py-2.5 pr-10 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500 cursor-pointer"
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <option key={opt.id} value={opt.id}>{opt.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            </div>
+
+            {/* View Toggle */}
+            <div className="flex bg-gray-800 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded ${viewMode === 'grid' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                <Grid3X3 className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded ${viewMode === 'list' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                <List className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && cards.length === 0 && (
+          <div className="text-center py-20 bg-gray-900/30 rounded-2xl border border-gray-800">
+            <Package className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-white mb-2">No Cards Yet</h3>
+            <p className="text-gray-400 mb-6">
+              {searchQuery || category !== 'all'
+                ? 'No cards match your filters. Try adjusting your search.'
+                : 'Start building your collection by adding your first card!'
+              }
+            </p>
+            <Link
+              href="/collection/add"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition"
+            >
+              <Plus className="w-5 h-5" />
+              Add Your First Card
+            </Link>
+          </div>
+        )}
+
+        {/* Cards Grid */}
+        {!loading && cards.length > 0 && (
+          <div className={viewMode === 'grid'
+            ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4'
+            : 'flex flex-col gap-3'
+          }>
+            {cards.map((card) => (
+              <div
+                key={card.id}
+                onClick={() => setSelectedCard(card)}
+                className={`group bg-gray-900/50 rounded-xl border border-gray-800 hover:border-purple-500/50 transition cursor-pointer overflow-hidden ${
+                  viewMode === 'list' ? 'flex' : ''
+                }`}
+              >
+                {/* Image */}
+                <div className={`relative bg-gray-800 ${viewMode === 'list' ? 'w-24 h-24' : 'aspect-[3/4]'}`}>
+                  {card.image_url ? (
+                    <img
+                      src={card.image_url}
+                      alt={card.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Tag className="w-8 h-8 text-gray-600" />
+                    </div>
+                  )}
+                  
+                  {/* Rarity Badge */}
+                  {card.rarity && card.rarity !== 'common' && (
+                    <div className={`absolute top-2 left-2 px-2 py-0.5 text-xs font-bold rounded ${
+                      card.rarity === 'legendary' ? 'bg-amber-500 text-black' :
+                      card.rarity === 'epic' ? 'bg-purple-500 text-white' :
+                      card.rarity === 'rare' ? 'bg-blue-500 text-white' :
+                      'bg-green-500 text-white'
+                    }`}>
+                      {card.rarity.toUpperCase()}
+                    </div>
+                  )}
+                  
+                  {/* Graded Badge */}
+                  {card.is_graded && (
+                    <div className="absolute top-2 right-2 px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded">
+                      {card.grading_company} {card.grade}
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-xl font-bold">{stat.value}</p>
+
+                {/* Info */}
+                <div className={`p-3 ${viewMode === 'list' ? 'flex-1 flex items-center justify-between' : ''}`}>
+                  <div>
+                    <h3 className="font-medium text-white text-sm line-clamp-2 group-hover:text-purple-400 transition">
+                      {card.name}
+                    </h3>
+                    {card.set_name && (
+                      <p className="text-xs text-gray-500 mt-0.5">{card.set_name}</p>
+                    )}
+                  </div>
+                  
+                  {card.current_value && (
+                    <div className={`text-green-400 font-bold ${viewMode === 'list' ? '' : 'mt-2'}`}>
+                      ${card.current_value.toLocaleString()}
+                    </div>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Filters & Search */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search cards..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="flex gap-2">
-          {CATEGORIES.map((cat) => (
-            <Button
-              key={cat.id}
-              variant={selectedCategory === cat.id ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedCategory(cat.id)}
-              className="gap-1"
-            >
-              <span>{cat.icon}</span>
-              <span className="hidden sm:inline">{cat.name}</span>
-            </Button>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setViewMode('grid')}
-            className={viewMode === 'grid' ? 'bg-muted' : ''}
-          >
-            <Grid3X3 className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setViewMode('list')}
-            className={viewMode === 'list' ? 'bg-muted' : ''}
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-          >
-            {sortOrder === 'desc' ? <SortDesc className="h-4 w-4" /> : <SortAsc className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
-
-      {/* Cards Grid/List */}
-      <AnimatePresence mode="wait">
-        {viewMode === 'grid' ? (
-          <motion.div
-            key="grid"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          >
-            {filteredCards.map((card, index) => {
-              const profit = card.current_value - card.purchase_price
-              const cardRoi = ((profit / card.purchase_price) * 100).toFixed(1)
-              
-              return (
-                <motion.div
-                  key={card.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <Card className={`overflow-hidden hover:scale-[1.02] transition-all cursor-pointer ${getRarityClass(card.rarity)}`}>
-                    <div className="aspect-[3/4] bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center text-6xl relative">
-                      {card.image}
-                      {card.grading_company && (
-                        <div className="absolute top-2 right-2">
-                          <Badge variant={card.grading_company === 'PSA' ? 'psa' : 'bgs'}>
-                            {card.grading_company} {card.grade}
-                          </Badge>
-                        </div>
-                      )}
-                      <Badge variant={card.category as any} className="absolute top-2 left-2">
-                        {card.category}
-                      </Badge>
-                    </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold truncate">{card.name}</h3>
-                      <p className="text-sm text-muted-foreground">{card.set_name}</p>
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-lg font-bold">${card.current_value.toLocaleString()}</span>
-                        <span className={`text-sm flex items-center gap-1 ${profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {profit >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                          {cardRoi}%
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )
-            })}
-          </motion.div>
-        ) : (
-          <motion.div
-            key="list"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="space-y-2"
-          >
-            {filteredCards.map((card, index) => {
-              const profit = card.current_value - card.purchase_price
-              const cardRoi = ((profit / card.purchase_price) * 100).toFixed(1)
-              
-              return (
-                <motion.div
-                  key={card.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <Card className={`hover:bg-muted/50 transition-colors cursor-pointer ${getRarityClass(card.rarity)}`}>
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <div className="text-3xl">{card.image}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold truncate">{card.name}</h3>
-                          <Badge variant={card.category as any} className="text-xs">{card.category}</Badge>
-                          {card.grading_company && (
-                            <Badge variant={card.grading_company === 'PSA' ? 'psa' : 'bgs'} className="text-xs">
-                              {card.grading_company} {card.grade}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">{card.set_name} • {card.year}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold">${card.current_value.toLocaleString()}</p>
-                        <p className={`text-sm ${profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {profit >= 0 ? '+' : ''}{cardRoi}%
-                        </p>
-                      </div>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )
-            })}
-          </motion.div>
+            ))}
+          </div>
         )}
-      </AnimatePresence>
+
+        {/* Card Detail Modal */}
+        {selectedCard && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-900 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                {/* Image */}
+                <div className="aspect-[3/4] bg-gray-800 rounded-xl mb-4 overflow-hidden">
+                  {selectedCard.image_url ? (
+                    <img src={selectedCard.image_url} alt={selectedCard.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Tag className="w-16 h-16 text-gray-600" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Details */}
+                <h2 className="text-xl font-bold text-white mb-2">{selectedCard.name}</h2>
+                
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {selectedCard.set_name && (
+                    <div>
+                      <span className="text-gray-500 text-sm">Set</span>
+                      <p className="text-white">{selectedCard.set_name}</p>
+                    </div>
+                  )}
+                  {selectedCard.card_number && (
+                    <div>
+                      <span className="text-gray-500 text-sm">Number</span>
+                      <p className="text-white">{selectedCard.card_number}</p>
+                    </div>
+                  )}
+                  {selectedCard.year && (
+                    <div>
+                      <span className="text-gray-500 text-sm">Year</span>
+                      <p className="text-white">{selectedCard.year}</p>
+                    </div>
+                  )}
+                  {selectedCard.condition && (
+                    <div>
+                      <span className="text-gray-500 text-sm">Condition</span>
+                      <p className="text-white capitalize">{selectedCard.condition.replace('_', ' ')}</p>
+                    </div>
+                  )}
+                  {selectedCard.is_graded && (
+                    <div>
+                      <span className="text-gray-500 text-sm">Grade</span>
+                      <p className="text-white">{selectedCard.grading_company} {selectedCard.grade}</p>
+                    </div>
+                  )}
+                  {selectedCard.current_value && (
+                    <div>
+                      <span className="text-gray-500 text-sm">Value</span>
+                      <p className="text-green-400 font-bold">${selectedCard.current_value.toLocaleString()}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3">
+                  <Link
+                    href={`/collection/edit/${selectedCard.id}`}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    Edit
+                  </Link>
+                  <button
+                    onClick={() => deleteCard(selectedCard.id)}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setSelectedCard(null)}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
