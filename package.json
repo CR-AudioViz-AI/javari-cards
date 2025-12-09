@@ -1,7 +1,7 @@
 {
   "name": "crav-cardverse",
   "version": "1.0.0",
-  "description": "CardVerse - Premium Trading Card Collection Platform",
+  "description": "CravCards - Premium Trading Card Collection Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -29,6 +29,7 @@
     "@radix-ui/react-toast": "^1.1.5",
     "@radix-ui/react-tooltip": "^1.0.7",
     "@stripe/stripe-js": "^2.2.0",
+    "@supabase/auth-helpers-nextjs": "^0.8.7",
     "@supabase/supabase-js": "^2.38.4",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
