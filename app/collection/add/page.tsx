@@ -12,7 +12,6 @@ import {
   Loader2,
   AlertCircle,
   Check,
-  Upload,
 } from 'lucide-react'
 
 const CATEGORIES = [
@@ -54,10 +53,10 @@ export default function AddCardPage() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   
-  // Form state
-  const [name, setName] = useState('')
+  // Form state - FIXED: renamed setName to cardSetName
+  const [cardName, setCardName] = useState('')
   const [category, setCategory] = useState('pokemon')
-  const [setName, setSetName] = useState('')
+  const [cardSetName, setCardSetName] = useState('')
   const [cardNumber, setCardNumber] = useState('')
   const [year, setYear] = useState('')
   const [rarity, setRarity] = useState('common')
@@ -98,9 +97,9 @@ export default function AddCardPage() {
       // Insert card
       const { error: insertError } = await supabase.from('cards').insert({
         user_id: user.id,
-        name,
+        name: cardName,
         category,
-        set_name: setName || null,
+        set_name: cardSetName || null,
         card_number: cardNumber || null,
         year: year ? parseInt(year) : null,
         rarity,
@@ -138,7 +137,7 @@ export default function AddCardPage() {
     )
   }
 
-  // Not logged in - show message (don't redirect, let them see the page)
+  // Not logged in - show message (don't redirect)
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
@@ -214,8 +213,8 @@ export default function AddCardPage() {
             </label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={cardName}
+              onChange={(e) => setCardName(e.target.value)}
               placeholder="e.g., Charizard VMAX"
               className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
               required
@@ -250,8 +249,8 @@ export default function AddCardPage() {
               <label className="block text-sm font-medium text-gray-300 mb-2">Set Name</label>
               <input
                 type="text"
-                value={setName}
-                onChange={(e) => setSetName(e.target.value)}
+                value={cardSetName}
+                onChange={(e) => setCardSetName(e.target.value)}
                 placeholder="e.g., Shining Fates"
                 className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
               />
@@ -433,7 +432,7 @@ export default function AddCardPage() {
             </Link>
             <button
               type="submit"
-              disabled={saving || !name}
+              disabled={saving || !cardName}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-lg transition disabled:opacity-50"
             >
               {saving ? (
