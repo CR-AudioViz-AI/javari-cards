@@ -216,7 +216,7 @@ export default function SignupPage() {
                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
                   <Sparkles className="h-6 w-6 text-white" />
                 </div>
-                <h1 className="text-3xl font-bold text-white">CardVerse</h1>
+                <h1 className="text-3xl font-bold text-white">CravCards</h1>
               </div>
               <p className="text-xl text-slate-300">
                 The ultimate platform for card collectors
