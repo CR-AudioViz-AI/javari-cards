@@ -1,210 +1,187 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useRouter } from 'next/navigation'
-import {
-  User,
-  Bell,
-  Shield,
-  CreditCard,
-  Palette,
-  Globe,
-  Trash2,
-  Save,
-  LogOut,
-} from 'lucide-react'
+import { useState } from 'react'
+import Link from 'next/link'
+import { useAuth } from '@/components/AuthProvider'
+import { ArrowLeft, Loader2, AlertCircle, Bell, Eye, Shield, Palette, Check } from 'lucide-react'
 
 export default function SettingsPage() {
-  const [loading, setLoading] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [user, setUser] = useState<any>(null)
-  const router = useRouter()
-  const supabase = createClientComponentClient()
-
-  const [settings, setSettings] = useState({
-    displayName: '',
-    email: '',
-    notifications: {
-      email: true,
-      push: true,
-      marketing: false,
-    },
-    privacy: {
-      publicProfile: true,
-      showCollection: true,
-      showValue: false,
-    },
-    theme: 'dark',
+  const { user, loading: authLoading } = useAuth()
+  
+  const [notifications, setNotifications] = useState({
+    email: true,
+    push: false,
+    trades: true,
+    trivia: true,
+    clubs: true,
   })
+  
+  const [privacy, setPrivacy] = useState({
+    publicProfile: true,
+    showCollection: true,
+    showValue: false,
+  })
+  
+  const [theme, setTheme] = useState('dark')
+  const [saved, setSaved] = useState(false)
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/login')
-        return
-      }
-      setUser(user)
-      setSettings(prev => ({
-        ...prev,
-        displayName: user.user_metadata?.full_name || '',
-        email: user.email || '',
-      }))
-    }
-    getUser()
-  }, [supabase, router])
-
-  const handleSave = async () => {
-    setLoading(true)
-    // Simulate save
-    await new Promise(resolve => setTimeout(resolve, 1000))
+  const handleSave = () => {
     setSaved(true)
-    setLoading(false)
-    setTimeout(() => setSaved(false), 3000)
+    setTimeout(() => setSaved(false), 2000)
   }
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
+        <div className="max-w-2xl mx-auto px-4 text-center pt-20">
+          <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-4">Sign In Required</h1>
+          <p className="text-gray-400 mb-6">You need to be signed in to access settings.</p>
+          <Link href="/auth/login?redirect=/settings" className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition">
+            Sign In
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-950 via-purple-950 to-black py-8">
-      <div className="max-w-3xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
-        <p className="text-gray-400 mb-8">Manage your account and preferences</p>
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
+      <div className="max-w-2xl mx-auto px-4">
+        <div className="flex items-center gap-4 mb-8">
+          <Link href="/dashboard" className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition">
+            <ArrowLeft className="w-5 h-5 text-gray-400" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Settings</h1>
+            <p className="text-gray-400">Manage your account preferences</p>
+          </div>
+        </div>
 
         {saved && (
-          <div className="mb-6 p-4 bg-green-900/30 border border-green-500/50 rounded-lg text-green-400">
-            ✅ Settings saved successfully!
+          <div className="mb-6 p-4 bg-green-900/30 border border-green-500/50 rounded-lg flex items-center gap-3 text-green-400">
+            <Check className="w-5 h-5" />
+            Settings saved successfully!
           </div>
         )}
 
-        {/* Profile Section */}
-        <div className="bg-gray-900/50 rounded-2xl p-6 border border-purple-900/30 mb-6">
-          <div className="flex items-center gap-3 mb-6">
-            <User className="w-6 h-6 text-purple-400" />
-            <h2 className="text-xl font-bold text-white">Profile</h2>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Display Name</label>
-              <input
-                type="text"
-                value={settings.displayName}
-                onChange={(e) => setSettings({ ...settings, displayName: e.target.value })}
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500"
-              />
+        <div className="space-y-6">
+          {/* Notifications */}
+          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+            <div className="flex items-center gap-3 mb-4">
+              <Bell className="w-5 h-5 text-purple-400" />
+              <h2 className="text-lg font-bold text-white">Notifications</h2>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
-              <input
-                type="email"
-                value={settings.email}
-                disabled
-                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-gray-400"
-              />
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+            <div className="space-y-4">
+              {Object.entries(notifications).map(([key, value]) => (
+                <label key={key} className="flex items-center justify-between cursor-pointer">
+                  <span className="text-gray-300 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setNotifications({ ...notifications, [key]: !value })}
+                    className={`relative w-12 h-6 rounded-full transition ${value ? 'bg-purple-600' : 'bg-gray-700'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition ${value ? 'left-7' : 'left-1'}`} />
+                  </button>
+                </label>
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Notifications Section */}
-        <div className="bg-gray-900/50 rounded-2xl p-6 border border-purple-900/30 mb-6">
-          <div className="flex items-center gap-3 mb-6">
-            <Bell className="w-6 h-6 text-purple-400" />
-            <h2 className="text-xl font-bold text-white">Notifications</h2>
+          {/* Privacy */}
+          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+            <div className="flex items-center gap-3 mb-4">
+              <Eye className="w-5 h-5 text-purple-400" />
+              <h2 className="text-lg font-bold text-white">Privacy</h2>
+            </div>
+            <div className="space-y-4">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-gray-300">Public Profile</span>
+                <button
+                  type="button"
+                  onClick={() => setPrivacy({ ...privacy, publicProfile: !privacy.publicProfile })}
+                  className={`relative w-12 h-6 rounded-full transition ${privacy.publicProfile ? 'bg-purple-600' : 'bg-gray-700'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition ${privacy.publicProfile ? 'left-7' : 'left-1'}`} />
+                </button>
+              </label>
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-gray-300">Show Collection</span>
+                <button
+                  type="button"
+                  onClick={() => setPrivacy({ ...privacy, showCollection: !privacy.showCollection })}
+                  className={`relative w-12 h-6 rounded-full transition ${privacy.showCollection ? 'bg-purple-600' : 'bg-gray-700'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition ${privacy.showCollection ? 'left-7' : 'left-1'}`} />
+                </button>
+              </label>
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-gray-300">Show Collection Value</span>
+                <button
+                  type="button"
+                  onClick={() => setPrivacy({ ...privacy, showValue: !privacy.showValue })}
+                  className={`relative w-12 h-6 rounded-full transition ${privacy.showValue ? 'bg-purple-600' : 'bg-gray-700'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition ${privacy.showValue ? 'left-7' : 'left-1'}`} />
+                </button>
+              </label>
+            </div>
           </div>
 
-          <div className="space-y-4">
-            {[
-              { key: 'email', label: 'Email notifications', desc: 'Receive updates via email' },
-              { key: 'push', label: 'Push notifications', desc: 'Browser notifications' },
-              { key: 'marketing', label: 'Marketing emails', desc: 'News and promotions' },
-            ].map((item) => (
-              <div key={item.key} className="flex items-center justify-between">
-                <div>
-                  <div className="text-white font-medium">{item.label}</div>
-                  <div className="text-sm text-gray-400">{item.desc}</div>
-                </div>
+          {/* Theme */}
+          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+            <div className="flex items-center gap-3 mb-4">
+              <Palette className="w-5 h-5 text-purple-400" />
+              <h2 className="text-lg font-bold text-white">Appearance</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {['dark', 'light', 'system'].map((t) => (
                 <button
-                  onClick={() => setSettings({
-                    ...settings,
-                    notifications: {
-                      ...settings.notifications,
-                      [item.key]: !settings.notifications[item.key as keyof typeof settings.notifications]
-                    }
-                  })}
-                  className={`w-12 h-6 rounded-full transition ${
-                    settings.notifications[item.key as keyof typeof settings.notifications] ? 'bg-purple-600' : 'bg-gray-700'
+                  key={t}
+                  onClick={() => setTheme(t)}
+                  className={`p-3 rounded-lg border capitalize transition ${
+                    theme === t
+                      ? 'bg-purple-600 border-purple-500 text-white'
+                      : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
                   }`}
                 >
-                  <div className={`w-5 h-5 bg-white rounded-full transition transform ${
-                    settings.notifications[item.key as keyof typeof settings.notifications] ? 'translate-x-6' : 'translate-x-0.5'
-                  }`} />
+                  {t}
                 </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Account */}
+          <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-800">
+            <div className="flex items-center gap-3 mb-4">
+              <Shield className="w-5 h-5 text-purple-400" />
+              <h2 className="text-lg font-bold text-white">Account</h2>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Email</span>
+                <span className="text-white">{user.email}</span>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Privacy Section */}
-        <div className="bg-gray-900/50 rounded-2xl p-6 border border-purple-900/30 mb-6">
-          <div className="flex items-center gap-3 mb-6">
-            <Shield className="w-6 h-6 text-purple-400" />
-            <h2 className="text-xl font-bold text-white">Privacy</h2>
-          </div>
-
-          <div className="space-y-4">
-            {[
-              { key: 'publicProfile', label: 'Public profile', desc: 'Allow others to view your profile' },
-              { key: 'showCollection', label: 'Show collection', desc: 'Display your cards publicly' },
-              { key: 'showValue', label: 'Show collection value', desc: 'Display your total value' },
-            ].map((item) => (
-              <div key={item.key} className="flex items-center justify-between">
-                <div>
-                  <div className="text-white font-medium">{item.label}</div>
-                  <div className="text-sm text-gray-400">{item.desc}</div>
-                </div>
-                <button
-                  onClick={() => setSettings({
-                    ...settings,
-                    privacy: {
-                      ...settings.privacy,
-                      [item.key]: !settings.privacy[item.key as keyof typeof settings.privacy]
-                    }
-                  })}
-                  className={`w-12 h-6 rounded-full transition ${
-                    settings.privacy[item.key as keyof typeof settings.privacy] ? 'bg-purple-600' : 'bg-gray-700'
-                  }`}
-                >
-                  <div className={`w-5 h-5 bg-white rounded-full transition transform ${
-                    settings.privacy[item.key as keyof typeof settings.privacy] ? 'translate-x-6' : 'translate-x-0.5'
-                  }`} />
-                </button>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Member Since</span>
+                <span className="text-white">{new Date(user.created_at).toLocaleDateString()}</span>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
 
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-4">
           <button
             onClick={handleSave}
-            disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-medium rounded-lg transition"
+            className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-lg transition"
           >
-            <Save className="w-5 h-5" />
-            {loading ? 'Saving...' : 'Save Changes'}
-          </button>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium rounded-lg transition border border-red-600/50"
-          >
-            <LogOut className="w-5 h-5" />
-            Sign Out
+            Save Settings
           </button>
         </div>
       </div>
