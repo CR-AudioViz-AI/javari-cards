@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import GlobalHeader from '@/components/GlobalHeader';
 import AuthProvider from '@/components/AuthProvider';
+import JavariWrapper from '@/components/JavariWrapper';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -42,6 +43,7 @@ export default function RootLayout({
           <main className="pt-16">
             {children}
           </main>
+          <JavariWrapper sourceApp="cardverse" />
         </AuthProvider>
       </body>
     </html>
