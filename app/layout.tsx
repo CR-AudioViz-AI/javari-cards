@@ -8,21 +8,21 @@ import JavariWrapper from '@/components/JavariWrapper';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'CravCards | Premium Digital Card Collection Platform',
-  description: 'Collect, trade, and showcase premium digital cards. Build your ultimate collection with CravCards - part of the CR AudioViz AI ecosystem.',
-  keywords: ['digital cards', 'trading cards', 'collectibles', 'NFT', 'collection', 'CravCards', 'CR AudioViz AI'],
+  title: 'CravCards | Premium Trading Card Collection Platform',
+  description: 'Collect, trade, and showcase your trading card collection. Build your ultimate collection with CravCards - part of the CR AudioViz AI ecosystem.',
+  keywords: ['trading cards', 'pokemon cards', 'sports cards', 'mtg', 'collectibles', 'CravCards', 'CR AudioViz AI'],
   authors: [{ name: 'CR AudioViz AI' }],
   openGraph: {
-    title: 'CravCards | Premium Digital Card Collection Platform',
-    description: 'Collect, trade, and showcase premium digital cards. Build your ultimate collection.',
+    title: 'CravCards | Premium Trading Card Collection Platform',
+    description: 'Collect, trade, and showcase your trading card collection. Build your ultimate collection.',
     url: 'https://cravcards.com',
     siteName: 'CravCards',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'CravCards | Premium Digital Card Collection Platform',
-    description: 'Collect, trade, and showcase premium digital cards.',
+    title: 'CravCards | Premium Trading Card Collection Platform',
+    description: 'Collect, trade, and showcase your trading card collection.',
   },
   robots: {
     index: true,
@@ -43,7 +43,7 @@ export default function RootLayout({
           <main className="pt-16">
             {children}
           </main>
-          <JavariWrapper sourceApp="cardverse" />
+          <JavariWrapper sourceApp="cravcards" />
         </AuthProvider>
       </body>
     </html>
