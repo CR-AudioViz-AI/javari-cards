@@ -1,7 +1,7 @@
 {
   "name": "crav-cardverse",
-  "version": "1.0.0",
-  "description": "CravCards - Premium Trading Card Collection Platform",
+  "version": "0.1.1",
+  "description": "CravCards - Premium Trading Card Platform. Rebuild: 2025-12-12 17:15",
   "private": true,
   "scripts": {
     "dev": "next dev",
