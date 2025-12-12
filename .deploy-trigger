@@ -1,11 +1,1 @@
-# Auth fix complete - 2025-12-09T21:05:11Z
-All pages now use AuthProvider:
-- Add Card
-- Import  
-- Scan
-- Clubs Create
-- Marketplace Create
-- Settings
-- Achievements
-
-No more redirect loops!
+Deployment trigger: 2025-12-12T01:14:20Z
