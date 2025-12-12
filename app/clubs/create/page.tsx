@@ -8,12 +8,12 @@ import { useAuth } from '@/components/AuthProvider'
 import { ArrowLeft, Loader2, AlertCircle, Check, Users, Crown, MapPin, Trophy, Sparkles, Shield, TrendingUp } from 'lucide-react'
 
 const CLUB_TYPES = [
-  { id: 'braggers', name: 'Braggers Club', description: 'Show off your best cards', icon: Crown, emoji: '👑' },
-  { id: 'regional', name: 'Regional', description: 'Connect with local collectors', icon: MapPin, emoji: '📍' },
-  { id: 'team', name: 'Team Fans', description: 'Unite with fellow fans', icon: Trophy, emoji: '🏆' },
-  { id: 'tcg', name: 'TCG', description: 'Trading card game focused', icon: Sparkles, emoji: '✨' },
-  { id: 'grading', name: 'Grading', description: 'Professional grade discussion', icon: Shield, emoji: '🛡️' },
-  { id: 'investment', name: 'Investment', description: 'Value and market analysis', icon: TrendingUp, emoji: '📈' },
+  { id: 'braggers', name: 'Braggers Club', description: 'Show off your best cards', icon: Crown, emoji: '👑', color: 'from-yellow-500 to-orange-500' },
+  { id: 'regional', name: 'Regional', description: 'Connect with local collectors', icon: MapPin, emoji: '📍', color: 'from-blue-500 to-cyan-500' },
+  { id: 'team', name: 'Team Fans', description: 'Unite with fellow fans', icon: Trophy, emoji: '🏆', color: 'from-red-500 to-pink-500' },
+  { id: 'tcg', name: 'TCG', description: 'Trading card game focused', icon: Sparkles, emoji: '✨', color: 'from-purple-500 to-pink-500' },
+  { id: 'grading', name: 'Grading', description: 'Professional grade discussion', icon: Shield, emoji: '🛡️', color: 'from-green-500 to-emerald-500' },
+  { id: 'investment', name: 'Investment', description: 'Value and market analysis', icon: TrendingUp, emoji: '📈', color: 'from-indigo-500 to-purple-500' },
 ]
 
 export default function CreateClubPage() {
@@ -39,40 +39,101 @@ export default function CreateClubPage() {
     setSaving(true)
 
     try {
-      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+      // IMPORTANT: Ensure user profile exists first
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single()
+
+      if (!existingProfile) {
+        // Create profile if it doesn't exist
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0],
+            avatar_url: user.user_metadata?.avatar_url || null,
+          })
+        
+        if (profileError) {
+          console.error('Profile creation error:', profileError)
+          // Continue anyway - club can still be created
+        }
+      }
+
+      // Generate slug from name
+      const slug = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '')
+        .substring(0, 50)
+      
+      // Check if slug already exists
+      const { data: existingClub } = await supabase
+        .from('clubs')
+        .select('id')
+        .eq('slug', slug)
+        .single()
+      
+      const finalSlug = existingClub 
+        ? `${slug}-${Date.now().toString(36)}` 
+        : slug
+
       const selectedType = CLUB_TYPES.find(t => t.id === clubType)
       
+      // Create the club
       const { data, error: insertError } = await supabase
         .from('clubs')
         .insert({
           name,
-          slug,
-          description,
+          slug: finalSlug,
+          description: description || null,
           club_type: clubType,
           owner_id: user.id,
           is_private: isPrivate,
+          is_verified: false,
           requirement: requirement || null,
           banner_emoji: selectedType?.emoji || '🎴',
+          banner_color: selectedType?.color || 'from-gray-500 to-gray-600',
           member_count: 1,
         })
         .select()
         .single()
 
-      if (insertError) throw insertError
+      if (insertError) {
+        console.error('Club insert error:', insertError)
+        throw insertError
+      }
 
       // Add owner as first member
-      await supabase.from('club_members').insert({
-        club_id: data.id,
-        user_id: user.id,
-        role: 'owner',
-      })
+      const { error: memberError } = await supabase
+        .from('club_members')
+        .insert({
+          club_id: data.id,
+          user_id: user.id,
+          role: 'owner',
+        })
+
+      if (memberError) {
+        console.error('Member insert error:', memberError)
+        // Don't throw - club was created successfully
+      }
 
       setSuccess(true)
       setTimeout(() => {
         router.push('/clubs')
       }, 1500)
     } catch (err: any) {
-      setError(err.message || 'Failed to create club')
+      console.error('Create club error:', err)
+      if (err.code === '23505') {
+        setError('A club with this name already exists. Please choose a different name.')
+      } else if (err.code === '23503') {
+        setError('Unable to create club. Please try signing out and back in.')
+      } else {
+        setError(err.message || 'Failed to create club. Please try again.')
+      }
     } finally {
       setSaving(false)
     }
@@ -120,6 +181,8 @@ export default function CreateClubPage() {
     )
   }
 
+  const selectedTypeInfo = CLUB_TYPES.find(t => t.id === clubType)
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
       <div className="max-w-2xl mx-auto px-4">
@@ -134,11 +197,22 @@ export default function CreateClubPage() {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-lg flex items-center gap-3 text-red-400">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-            {error}
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-lg flex items-start gap-3 text-red-400">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>{error}</div>
           </div>
         )}
+
+        {/* Preview */}
+        <div className="mb-8 bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden">
+          <div className={`h-20 bg-gradient-to-r ${selectedTypeInfo?.color || 'from-gray-500 to-gray-600'} flex items-center justify-center`}>
+            <span className="text-4xl">{selectedTypeInfo?.emoji || '🎴'}</span>
+          </div>
+          <div className="p-4">
+            <h3 className="font-bold text-white">{name || 'Your Club Name'}</h3>
+            <p className="text-sm text-gray-400">{description || 'Club description will appear here...'}</p>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
@@ -150,9 +224,11 @@ export default function CreateClubPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Pokémon Masters"
+              maxLength={50}
               className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
               required
             />
+            <p className="text-xs text-gray-500 mt-1">{name.length}/50 characters</p>
           </div>
 
           <div>
@@ -188,9 +264,11 @@ export default function CreateClubPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
+              maxLength={500}
               placeholder="What is your club about?"
               className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 resize-none"
             />
+            <p className="text-xs text-gray-500 mt-1">{description.length}/500 characters</p>
           </div>
 
           <div>
@@ -200,11 +278,12 @@ export default function CreateClubPage() {
               value={requirement}
               onChange={(e) => setRequirement(e.target.value)}
               placeholder="e.g., Own at least 10 graded cards"
+              maxLength={200}
               className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
             />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
             <input
               type="checkbox"
               id="private"
@@ -212,10 +291,13 @@ export default function CreateClubPage() {
               onChange={(e) => setIsPrivate(e.target.checked)}
               className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-purple-600 focus:ring-purple-500"
             />
-            <label htmlFor="private" className="text-white">Make this club private (invite only)</label>
+            <div>
+              <label htmlFor="private" className="text-white font-medium cursor-pointer">Make this club private</label>
+              <p className="text-sm text-gray-400">Only invited members can join</p>
+            </div>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-4 pt-4">
             <Link
               href="/clubs"
               className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg transition text-center"
@@ -224,7 +306,7 @@ export default function CreateClubPage() {
             </Link>
             <button
               type="submit"
-              disabled={saving || !name}
+              disabled={saving || !name.trim()}
               className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-lg transition disabled:opacity-50"
             >
               {saving ? (
