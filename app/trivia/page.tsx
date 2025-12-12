@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/components/AuthProvider'
 import {
   Gamepad2,
   Trophy,
@@ -16,175 +18,38 @@ import {
   Target,
   Award,
   Brain,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 
-// Comprehensive trivia questions
-const TRIVIA_QUESTIONS = [
-  {
-    id: '1',
-    category: 'pokemon',
-    difficulty: 'easy',
-    question: 'What is the first Pokémon in the National Pokédex?',
-    options: ['Pikachu', 'Bulbasaur', 'Charmander', 'Squirtle'],
-    correct: 1,
-    explanation: 'Bulbasaur is #001 in the National Pokédex, making it the first Pokémon ever listed.',
-    xp: 10,
-  },
-  {
-    id: '2',
-    category: 'pokemon',
-    difficulty: 'medium',
-    question: 'Which Pokémon card sold for over $5 million, making it the most expensive Pokémon card ever?',
-    options: ['1st Edition Charizard', 'Pikachu Illustrator', 'Shining Charizard', 'Trophy Pikachu'],
-    correct: 1,
-    explanation: 'The Pikachu Illustrator card sold for $5.275 million in 2021. Only 39 copies exist.',
-    xp: 20,
-  },
-  {
-    id: '3',
-    category: 'pokemon',
-    difficulty: 'hard',
-    question: 'What makes a "Shadowless" Base Set card different from unlimited prints?',
-    options: ['Different artwork', 'No shadow under the image box', 'Gold borders', 'Holographic back'],
-    correct: 1,
-    explanation: 'Shadowless cards lack the drop shadow under the character image box that appears on unlimited prints.',
-    xp: 30,
-  },
-  {
-    id: '4',
-    category: 'mtg',
-    difficulty: 'easy',
-    question: 'What is the most powerful and valuable card in Magic: The Gathering?',
-    options: ['Time Walk', 'Black Lotus', 'Ancestral Recall', 'Mox Sapphire'],
-    correct: 1,
-    explanation: 'Black Lotus provides 3 mana of any color for free, making it the most powerful and valuable MTG card.',
-    xp: 10,
-  },
-  {
-    id: '5',
-    category: 'mtg',
-    difficulty: 'medium',
-    question: 'What year was Magic: The Gathering first released?',
-    options: ['1991', '1992', '1993', '1994'],
-    correct: 2,
-    explanation: 'MTG was created by Richard Garfield and released by Wizards of the Coast in 1993.',
-    xp: 20,
-  },
-  {
-    id: '6',
-    category: 'mtg',
-    difficulty: 'hard',
-    question: 'What is the "Reserved List" in Magic: The Gathering?',
-    options: [
-      'Cards banned in tournaments',
-      'Cards that will never be reprinted',
-      'First edition cards only',
-      'Cards with special artwork'
-    ],
-    correct: 1,
-    explanation: 'The Reserved List is a commitment by Wizards to never reprint certain powerful/valuable cards.',
-    xp: 30,
-  },
-  {
-    id: '7',
-    category: 'sports',
-    difficulty: 'easy',
-    question: 'What does "RC" stand for on a sports card?',
-    options: ['Rare Card', 'Rookie Card', 'Regular Card', 'Rated Card'],
-    correct: 1,
-    explanation: 'RC stands for Rookie Card - a players first officially licensed trading card.',
-    xp: 10,
-  },
-  {
-    id: '8',
-    category: 'sports',
-    difficulty: 'medium',
-    question: 'Which baseball card is known as the "Holy Grail" of collecting?',
-    options: ['1952 Mickey Mantle', 'T206 Honus Wagner', '1989 Ken Griffey Jr.', '1933 Babe Ruth'],
-    correct: 1,
-    explanation: 'The T206 Honus Wagner is considered the most valuable baseball card, selling for over $7 million.',
-    xp: 20,
-  },
-  {
-    id: '9',
-    category: 'sports',
-    difficulty: 'hard',
-    question: 'What was the "Junk Wax Era" in sports card collecting?',
-    options: ['1970-1979', '1980-1985', '1986-1993', '1994-2000'],
-    correct: 2,
-    explanation: 'The Junk Wax Era (1986-1993) saw massive overproduction, making most cards from this period worthless.',
-    xp: 30,
-  },
-  {
-    id: '10',
-    category: 'grading',
-    difficulty: 'easy',
-    question: 'What is the highest grade a card can receive from PSA?',
-    options: ['9', '9.5', '10', '11'],
-    correct: 2,
-    explanation: 'PSA 10 Gem Mint is the highest grade, indicating perfect condition.',
-    xp: 10,
-  },
-  {
-    id: '11',
-    category: 'grading',
-    difficulty: 'medium',
-    question: 'What does BGS stand for?',
-    options: ['Best Grading Service', 'Beckett Grading Services', 'Baseball Grading System', 'Basic Grade Score'],
-    correct: 1,
-    explanation: 'BGS stands for Beckett Grading Services, known for their subgrades system.',
-    xp: 20,
-  },
-  {
-    id: '12',
-    category: 'grading',
-    difficulty: 'hard',
-    question: 'What is a "Black Label" BGS 10?',
-    options: [
-      'A card with a black border',
-      'A BGS 10 with all four subgrades also being 10',
-      'A graded card in a black case',
-      'A card graded before 2010'
-    ],
-    correct: 1,
-    explanation: 'A Black Label BGS 10 means all four subgrades (centering, corners, edges, surface) are perfect 10s.',
-    xp: 30,
-  },
-  {
-    id: '13',
-    category: 'history',
-    difficulty: 'medium',
-    question: 'Why did Topps dump 1952 baseball cards into the Atlantic Ocean?',
-    options: ['They were defective', 'Unsold inventory storage costs', 'Licensing dispute', 'Government regulation'],
-    correct: 1,
-    explanation: 'Topps dumped unsold inventory to avoid storage costs, accidentally creating the scarcity that makes 1952 cards so valuable.',
-    xp: 25,
-  },
-  {
-    id: '14',
-    category: 'yugioh',
-    difficulty: 'easy',
-    question: 'What is the most iconic Yu-Gi-Oh! monster card?',
-    options: ['Dark Magician', 'Blue-Eyes White Dragon', 'Red-Eyes Black Dragon', 'Exodia'],
-    correct: 1,
-    explanation: 'Blue-Eyes White Dragon is the signature card of Seto Kaiba and the most recognizable Yu-Gi-Oh! card.',
-    xp: 10,
-  },
-  {
-    id: '15',
-    category: 'general',
-    difficulty: 'medium',
-    question: 'What company currently owns the exclusive MLB trading card license?',
-    options: ['Topps', 'Panini', 'Upper Deck', 'Fanatics'],
-    correct: 3,
-    explanation: 'Fanatics acquired Topps and now holds the exclusive MLB license starting in 2025.',
-    xp: 20,
-  },
-]
+// Types
+interface TriviaQuestion {
+  id: string
+  category: string
+  difficulty: string
+  question: string
+  correct_answer: string
+  wrong_answers: string[]
+  explanation: string
+  points: number
+  time_limit?: number
+}
+
+interface ShuffledQuestion {
+  id: string
+  category: string
+  difficulty: string
+  question: string
+  options: string[]
+  correctIndex: number
+  explanation: string
+  xp: number
+  timeLimit: number
+}
 
 const CATEGORIES = [
   { id: 'all', name: 'All Categories', icon: '🎯', color: 'from-purple-500 to-pink-500' },
@@ -193,70 +58,184 @@ const CATEGORIES = [
   { id: 'sports', name: 'Sports Cards', icon: '⚾', color: 'from-green-500 to-emerald-500' },
   { id: 'yugioh', name: 'Yu-Gi-Oh!', icon: '🐉', color: 'from-indigo-500 to-purple-500' },
   { id: 'grading', name: 'Grading', icon: '📊', color: 'from-red-500 to-orange-500' },
-  { id: 'history', name: 'Card History', icon: '📜', color: 'from-amber-500 to-yellow-500' },
+  { id: 'general', name: 'General', icon: '📜', color: 'from-amber-500 to-yellow-500' },
 ]
 
-type GameState = 'menu' | 'playing' | 'result' | 'answer'
+const DIFFICULTIES = [
+  { id: 'all', name: 'All Levels', multiplier: 1 },
+  { id: 'easy', name: 'Easy', multiplier: 1 },
+  { id: 'medium', name: 'Medium', multiplier: 1.5 },
+  { id: 'hard', name: 'Hard', multiplier: 2 },
+]
+
+type GameState = 'menu' | 'loading' | 'playing' | 'result' | 'answer'
 
 export default function TriviaPage() {
+  const supabase = createClientComponentClient()
+  const { user } = useAuth()
+  
+  // Game state
   const [gameState, setGameState] = useState<GameState>('menu')
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
+  const [selectedDifficulty, setSelectedDifficulty] = useState('all')
+  const [questions, setQuestions] = useState<ShuffledQuestion[]>([])
+  const [currentQuestion, setCurrentQuestion] = useState(0)
   const [score, setScore] = useState(0)
   const [streak, setStreak] = useState(0)
   const [bestStreak, setBestStreak] = useState(0)
-  const [xpEarned, setXpEarned] = useState(0)
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [timeLeft, setTimeLeft] = useState(30)
-  const [questions, setQuestions] = useState<typeof TRIVIA_QUESTIONS>([])
-  const [answers, setAnswers] = useState<boolean[]>([])
+  const [totalXP, setTotalXP] = useState(0)
+  const [error, setError] = useState('')
+  
+  // Stats
+  const [userStats, setUserStats] = useState({
+    totalGames: 0,
+    totalCorrect: 0,
+    bestScore: 0,
+    totalXP: 0,
+  })
 
-  // Filter and shuffle questions
-  const startGame = (category: string) => {
-    setSelectedCategory(category)
-    const filtered = category === 'all' 
-      ? TRIVIA_QUESTIONS 
-      : TRIVIA_QUESTIONS.filter(q => q.category === category)
-    const shuffled = [...filtered].sort(() => Math.random() - 0.5).slice(0, 10)
-    setQuestions(shuffled)
-    setCurrentQuestionIndex(0)
-    setScore(0)
-    setStreak(0)
-    setXpEarned(0)
-    setAnswers([])
-    setSelectedAnswer(null)
-    setTimeLeft(30)
-    setGameState('playing')
+  // Load user stats on mount
+  useEffect(() => {
+    if (user) {
+      loadUserStats()
+    }
+  }, [user])
+
+  const loadUserStats = async () => {
+    if (!user) return
+    
+    const { data } = await supabase
+      .from('trivia_scores')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    
+    if (data && data.length > 0) {
+      setUserStats({
+        totalGames: data.length,
+        totalCorrect: data.reduce((sum, g) => sum + (g.correct_answers || 0), 0),
+        bestScore: Math.max(...data.map(g => g.score || 0)),
+        totalXP: data.reduce((sum, g) => sum + (g.xp_earned || 0), 0),
+      })
+    }
   }
 
-  // Timer
-  useEffect(() => {
-    if (gameState === 'playing' && timeLeft > 0) {
-      const timer = setTimeout(() => setTimeLeft(t => t - 1), 1000)
-      return () => clearTimeout(timer)
-    } else if (timeLeft === 0 && gameState === 'playing') {
-      handleAnswer(-1) // Time's up, wrong answer
+  // Fetch questions from database
+  const fetchQuestions = async () => {
+    setGameState('loading')
+    setError('')
+    
+    try {
+      let query = supabase
+        .from('trivia_questions')
+        .select('*')
+        .limit(10)
+      
+      if (selectedCategory !== 'all') {
+        query = query.eq('category', selectedCategory)
+      }
+      
+      if (selectedDifficulty !== 'all') {
+        query = query.eq('difficulty', selectedDifficulty)
+      }
+      
+      const { data, error: fetchError } = await query
+      
+      if (fetchError) throw fetchError
+      
+      if (!data || data.length === 0) {
+        setError('No questions found for this category. Try a different selection.')
+        setGameState('menu')
+        return
+      }
+      
+      // Shuffle questions and prepare them
+      const shuffled = shuffleArray(data).slice(0, 10).map((q: TriviaQuestion) => {
+        // Combine correct and wrong answers, then shuffle
+        const allAnswers = [q.correct_answer, ...q.wrong_answers]
+        const shuffledAnswers = shuffleArray(allAnswers)
+        const correctIndex = shuffledAnswers.indexOf(q.correct_answer)
+        
+        return {
+          id: q.id,
+          category: q.category,
+          difficulty: q.difficulty,
+          question: q.question,
+          options: shuffledAnswers,
+          correctIndex,
+          explanation: q.explanation,
+          xp: q.points,
+          timeLimit: q.time_limit || 30,
+        }
+      })
+      
+      setQuestions(shuffled)
+      setCurrentQuestion(0)
+      setScore(0)
+      setStreak(0)
+      setTotalXP(0)
+      setSelectedAnswer(null)
+      setTimeLeft(shuffled[0]?.timeLimit || 30)
+      setGameState('playing')
+    } catch (err: any) {
+      console.error('Error fetching questions:', err)
+      setError('Failed to load questions. Please try again.')
+      setGameState('menu')
     }
-  }, [gameState, timeLeft])
+  }
 
-  const handleAnswer = (answerIndex: number) => {
+  // Shuffle array helper
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    return shuffled
+  }
+
+  // Timer effect
+  useEffect(() => {
+    if (gameState !== 'playing' || selectedAnswer !== null) return
+    
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          // Time's up - mark as incorrect
+          handleAnswer(-1) // -1 indicates no answer
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    
+    return () => clearInterval(timer)
+  }, [gameState, selectedAnswer, currentQuestion])
+
+  // Handle answer selection
+  const handleAnswer = (index: number) => {
     if (selectedAnswer !== null) return
-    setSelectedAnswer(answerIndex)
     
-    const currentQuestion = questions[currentQuestionIndex]
-    const isCorrect = answerIndex === currentQuestion.correct
-    
-    setAnswers([...answers, isCorrect])
+    setSelectedAnswer(index)
+    const question = questions[currentQuestion]
+    const isCorrect = index === question.correctIndex
     
     if (isCorrect) {
-      const streakBonus = streak >= 3 ? Math.floor(currentQuestion.xp * 0.5) : 0
-      const timeBonus = Math.floor(timeLeft / 3)
-      const totalXp = currentQuestion.xp + streakBonus + timeBonus
+      // Calculate XP with streak bonus
+      const streakBonus = Math.min(streak * 5, 50) // Max 50 bonus XP
+      const timeBonus = Math.floor(timeLeft / 3) // Bonus for fast answers
+      const earnedXP = question.xp + streakBonus + timeBonus
       
-      setScore(s => s + 1)
-      setStreak(s => s + 1)
-      setXpEarned(x => x + totalXp)
-      if (streak + 1 > bestStreak) setBestStreak(streak + 1)
+      setScore((prev) => prev + 1)
+      setStreak((prev) => prev + 1)
+      setTotalXP((prev) => prev + earnedXP)
+      
+      if (streak + 1 > bestStreak) {
+        setBestStreak(streak + 1)
+      }
     } else {
       setStreak(0)
     }
@@ -264,320 +243,416 @@ export default function TriviaPage() {
     setGameState('answer')
   }
 
+  // Next question
   const nextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(i => i + 1)
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion((prev) => prev + 1)
       setSelectedAnswer(null)
-      setTimeLeft(30)
+      setTimeLeft(questions[currentQuestion + 1]?.timeLimit || 30)
       setGameState('playing')
     } else {
+      // Game over - save score
+      saveScore()
       setGameState('result')
     }
   }
 
-  const currentQuestion = questions[currentQuestionIndex]
+  // Save score to database
+  const saveScore = async () => {
+    if (!user) return
+    
+    try {
+      await supabase.from('trivia_scores').insert({
+        user_id: user.id,
+        score,
+        total_questions: questions.length,
+        correct_answers: score,
+        category: selectedCategory,
+        difficulty: selectedDifficulty,
+        xp_earned: totalXP,
+        best_streak: bestStreak,
+      })
+      
+      // Update user stats
+      loadUserStats()
+    } catch (err) {
+      console.error('Error saving score:', err)
+    }
+  }
 
-  return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-4xl mx-auto">
-        <AnimatePresence mode="wait">
-          {/* Menu State */}
-          {gameState === 'menu' && (
-            <motion.div
-              key="menu"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="space-y-8"
-            >
-              {/* Header */}
-              <div className="text-center">
-                <div className="inline-flex items-center justify-center h-20 w-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 mb-4">
-                  <Gamepad2 className="h-10 w-10 text-white" />
-                </div>
-                <h1 className="text-4xl font-display font-bold">Card Trivia</h1>
-                <p className="text-muted-foreground mt-2">
-                  Test your trading card knowledge and earn XP!
-                </p>
-              </div>
+  // Restart game
+  const restartGame = () => {
+    setGameState('menu')
+    setQuestions([])
+    setCurrentQuestion(0)
+    setScore(0)
+    setStreak(0)
+    setBestStreak(0)
+    setTotalXP(0)
+    setSelectedAnswer(null)
+    setError('')
+  }
 
-              {/* Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <Trophy className="h-6 w-6 text-yellow-500 mx-auto mb-2" />
-                    <p className="text-2xl font-bold">1,247</p>
-                    <p className="text-xs text-muted-foreground">Total XP Earned</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <Flame className="h-6 w-6 text-orange-500 mx-auto mb-2" />
-                    <p className="text-2xl font-bold">{bestStreak}</p>
-                    <p className="text-xs text-muted-foreground">Best Streak</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <Target className="h-6 w-6 text-green-500 mx-auto mb-2" />
-                    <p className="text-2xl font-bold">78%</p>
-                    <p className="text-xs text-muted-foreground">Accuracy</p>
-                  </CardContent>
-                </Card>
-              </div>
+  // Get category info
+  const getCategoryInfo = (categoryId: string) => {
+    return CATEGORIES.find((c) => c.id === categoryId) || CATEGORIES[0]
+  }
 
-              {/* Category Selection */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Choose a Category</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {CATEGORIES.map((category) => (
-                      <motion.button
-                        key={category.id}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => startGame(category.id)}
-                        className={`p-4 rounded-xl bg-gradient-to-br ${category.color} text-white text-center transition-all hover:shadow-lg`}
-                      >
-                        <span className="text-2xl block mb-1">{category.icon}</span>
-                        <span className="text-sm font-medium">{category.name}</span>
-                      </motion.button>
-                    ))}
-                  </div>
+  // Render menu
+  if (gameState === 'menu') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
+        <div className="max-w-4xl mx-auto px-4">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4">
+              <Brain className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Card Trivia Challenge</h1>
+            <p className="text-gray-400">Test your knowledge and earn XP!</p>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-lg flex items-center gap-3 text-red-400">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {/* Stats Cards */}
+          {user && userStats.totalGames > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+              <Card className="bg-gray-800/50 border-gray-700">
+                <CardContent className="p-4 text-center">
+                  <Trophy className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-white">{userStats.bestScore}</p>
+                  <p className="text-xs text-gray-400">Best Score</p>
                 </CardContent>
               </Card>
+              <Card className="bg-gray-800/50 border-gray-700">
+                <CardContent className="p-4 text-center">
+                  <Target className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-white">{userStats.totalCorrect}</p>
+                  <p className="text-xs text-gray-400">Total Correct</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-gray-800/50 border-gray-700">
+                <CardContent className="p-4 text-center">
+                  <Gamepad2 className="w-6 h-6 text-purple-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-white">{userStats.totalGames}</p>
+                  <p className="text-xs text-gray-400">Games Played</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-gray-800/50 border-gray-700">
+                <CardContent className="p-4 text-center">
+                  <Zap className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-white">{userStats.totalXP.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400">Total XP</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-              {/* Recent Games */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Brain className="h-5 w-5" />
-                    Daily Challenge
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-4 rounded-xl bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold">Mixed Categories Challenge</p>
-                        <p className="text-sm text-muted-foreground">20 questions • 50 XP bonus</p>
+          {/* Category Selection */}
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-gray-400 mb-3">Select Category</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`p-3 rounded-lg border text-left transition ${
+                    selectedCategory === cat.id
+                      ? `bg-gradient-to-r ${cat.color} border-transparent text-white`
+                      : 'bg-gray-800 border-gray-700 text-gray-300 hover:bg-gray-700'
+                  }`}
+                >
+                  <span className="text-xl mr-2">{cat.icon}</span>
+                  <span className="font-medium text-sm">{cat.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Difficulty Selection */}
+          <div className="mb-8">
+            <h3 className="text-sm font-medium text-gray-400 mb-3">Select Difficulty</h3>
+            <div className="flex gap-2">
+              {DIFFICULTIES.map((diff) => (
+                <button
+                  key={diff.id}
+                  onClick={() => setSelectedDifficulty(diff.id)}
+                  className={`flex-1 py-3 rounded-lg border font-medium transition ${
+                    selectedDifficulty === diff.id
+                      ? 'bg-purple-600 border-purple-500 text-white'
+                      : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-700'
+                  }`}
+                >
+                  {diff.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Start Button */}
+          <Button
+            onClick={fetchQuestions}
+            size="lg"
+            className="w-full py-6 text-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+          >
+            <Gamepad2 className="w-6 h-6 mr-2" />
+            Start Game
+          </Button>
+
+          {/* Info */}
+          <div className="mt-8 p-4 bg-gray-800/30 rounded-lg border border-gray-700">
+            <h4 className="font-medium text-white mb-2">How to Play</h4>
+            <ul className="text-sm text-gray-400 space-y-1">
+              <li>• Answer 10 questions before time runs out</li>
+              <li>• Build streaks for bonus XP</li>
+              <li>• Faster answers earn more points</li>
+              <li>• Compete for the highest score!</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Render loading
+  if (gameState === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-purple-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-400">Loading questions...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Render game
+  if (gameState === 'playing' || gameState === 'answer') {
+    const question = questions[currentQuestion]
+    const category = getCategoryInfo(question.category)
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
+        <div className="max-w-2xl mx-auto px-4">
+          {/* Game Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <Badge className={`bg-gradient-to-r ${category.color}`}>
+                {category.icon} {category.name}
+              </Badge>
+              <Badge variant="outline" className="border-gray-600">
+                {question.difficulty}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-4">
+              {streak > 0 && (
+                <div className="flex items-center gap-1 text-orange-400">
+                  <Flame className="w-4 h-4" />
+                  <span className="font-bold">{streak}</span>
+                </div>
+              )}
+              <div className="text-white font-bold">
+                {currentQuestion + 1}/{questions.length}
+              </div>
+            </div>
+          </div>
+
+          {/* Progress */}
+          <Progress
+            value={(currentQuestion / questions.length) * 100}
+            className="h-2 mb-6"
+          />
+
+          {/* Timer */}
+          {gameState === 'playing' && (
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <Clock className={`w-5 h-5 ${timeLeft <= 10 ? 'text-red-500' : 'text-gray-400'}`} />
+              <span className={`text-2xl font-bold ${timeLeft <= 10 ? 'text-red-500' : 'text-white'}`}>
+                {timeLeft}s
+              </span>
+            </div>
+          )}
+
+          {/* Question Card */}
+          <Card className="bg-gray-800/50 border-gray-700 mb-6">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-bold text-white mb-6">{question.question}</h2>
+              
+              <div className="space-y-3">
+                {question.options.map((option, index) => {
+                  let buttonClass = 'w-full p-4 rounded-lg border text-left transition '
+                  
+                  if (gameState === 'answer') {
+                    if (index === question.correctIndex) {
+                      buttonClass += 'bg-green-500/20 border-green-500 text-green-400'
+                    } else if (index === selectedAnswer) {
+                      buttonClass += 'bg-red-500/20 border-red-500 text-red-400'
+                    } else {
+                      buttonClass += 'bg-gray-800 border-gray-700 text-gray-500'
+                    }
+                  } else {
+                    buttonClass += 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700 hover:border-gray-600'
+                  }
+                  
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleAnswer(index)}
+                      disabled={gameState === 'answer'}
+                      className={buttonClass}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded-lg text-sm font-medium">
+                          {String.fromCharCode(65 + index)}
+                        </span>
+                        <span className="flex-1">{option}</span>
+                        {gameState === 'answer' && index === question.correctIndex && (
+                          <CheckCircle className="w-5 h-5 text-green-500" />
+                        )}
+                        {gameState === 'answer' && index === selectedAnswer && index !== question.correctIndex && (
+                          <XCircle className="w-5 h-5 text-red-500" />
+                        )}
                       </div>
-                      <Button onClick={() => startGame('all')}>
-                        Play Now
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
+                    </button>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Answer Explanation */}
+          {gameState === 'answer' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <Card className="bg-gray-800/50 border-gray-700 mb-6">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    {selectedAnswer === question.correctIndex ? (
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-5 h-5 text-red-500 mt-0.5" />
+                    )}
+                    <div>
+                      <p className={`font-medium ${selectedAnswer === question.correctIndex ? 'text-green-400' : 'text-red-400'}`}>
+                        {selectedAnswer === question.correctIndex ? 'Correct!' : 'Incorrect'}
+                      </p>
+                      <p className="text-sm text-gray-400 mt-1">{question.explanation}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
+              <Button onClick={nextQuestion} className="w-full" size="lg">
+                {currentQuestion < questions.length - 1 ? (
+                  <>
+                    Next Question
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </>
+                ) : (
+                  <>
+                    See Results
+                    <Trophy className="w-5 h-5 ml-2" />
+                  </>
+                )}
+              </Button>
             </motion.div>
           )}
 
-          {/* Playing State */}
-          {(gameState === 'playing' || gameState === 'answer') && currentQuestion && (
-            <motion.div
-              key="playing"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-6"
-            >
-              {/* Progress Bar */}
-              <div className="flex items-center gap-4">
-                <Progress value={(currentQuestionIndex / questions.length) * 100} className="flex-1" />
-                <span className="text-sm text-muted-foreground">
-                  {currentQuestionIndex + 1} / {questions.length}
-                </span>
-              </div>
+          {/* Score Display */}
+          <div className="flex items-center justify-center gap-6 mt-6 text-sm">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-green-500" />
+              <span className="text-gray-400">Score:</span>
+              <span className="text-white font-bold">{score}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-500" />
+              <span className="text-gray-400">XP:</span>
+              <span className="text-white font-bold">{totalXP}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-              {/* Stats Row */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Badge variant="secondary" className="text-lg px-3 py-1">
-                    <Star className="h-4 w-4 mr-1" />
-                    {score} correct
-                  </Badge>
-                  {streak > 0 && (
-                    <Badge className="bg-orange-500 text-lg px-3 py-1">
-                      <Flame className="h-4 w-4 mr-1" />
-                      {streak} streak!
-                    </Badge>
-                  )}
+  // Render results
+  if (gameState === 'result') {
+    const percentage = Math.round((score / questions.length) * 100)
+    const rating = percentage >= 90 ? 'S' : percentage >= 70 ? 'A' : percentage >= 50 ? 'B' : percentage >= 30 ? 'C' : 'D'
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
+        <div className="max-w-md mx-auto px-4">
+          <Card className="bg-gray-800/50 border-gray-700">
+            <CardHeader className="text-center pb-2">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trophy className="w-10 h-10 text-white" />
+              </div>
+              <CardTitle className="text-2xl text-white">Game Complete!</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-6">
+              {/* Rating */}
+              <div>
+                <div className={`inline-flex items-center justify-center w-24 h-24 rounded-full text-4xl font-bold ${
+                  rating === 'S' ? 'bg-gradient-to-br from-yellow-500 to-amber-500 text-white' :
+                  rating === 'A' ? 'bg-gradient-to-br from-green-500 to-emerald-500 text-white' :
+                  rating === 'B' ? 'bg-gradient-to-br from-blue-500 to-cyan-500 text-white' :
+                  rating === 'C' ? 'bg-gradient-to-br from-orange-500 to-amber-500 text-white' :
+                  'bg-gradient-to-br from-gray-500 to-gray-600 text-white'
+                }`}>
+                  {rating}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Clock className={`h-5 w-5 ${timeLeft <= 10 ? 'text-red-500' : 'text-muted-foreground'}`} />
-                  <span className={`text-xl font-bold ${timeLeft <= 10 ? 'text-red-500' : ''}`}>
-                    {timeLeft}s
-                  </span>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 bg-gray-700/50 rounded-lg">
+                  <Target className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-white">{score}/{questions.length}</p>
+                  <p className="text-xs text-gray-400">Correct</p>
+                </div>
+                <div className="p-4 bg-gray-700/50 rounded-lg">
+                  <Zap className="w-6 h-6 text-amber-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-white">{totalXP}</p>
+                  <p className="text-xs text-gray-400">XP Earned</p>
+                </div>
+                <div className="p-4 bg-gray-700/50 rounded-lg">
+                  <Flame className="w-6 h-6 text-orange-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-white">{bestStreak}</p>
+                  <p className="text-xs text-gray-400">Best Streak</p>
+                </div>
+                <div className="p-4 bg-gray-700/50 rounded-lg">
+                  <Star className="w-6 h-6 text-purple-500 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-white">{percentage}%</p>
+                  <p className="text-xs text-gray-400">Accuracy</p>
                 </div>
               </div>
 
-              {/* Question Card */}
-              <Card className="overflow-hidden">
-                <div className={`h-2 bg-gradient-to-r ${CATEGORIES.find(c => c.id === currentQuestion.category)?.color}`} />
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Badge variant="outline">{currentQuestion.category}</Badge>
-                    <Badge variant={
-                      currentQuestion.difficulty === 'easy' ? 'secondary' :
-                      currentQuestion.difficulty === 'medium' ? 'default' : 'destructive'
-                    }>
-                      {currentQuestion.difficulty}
-                    </Badge>
-                    <Badge variant="secondary" className="ml-auto">
-                      +{currentQuestion.xp} XP
-                    </Badge>
-                  </div>
-                  
-                  <h2 className="text-xl font-semibold mb-6">{currentQuestion.question}</h2>
-                  
-                  <div className="grid gap-3">
-                    {currentQuestion.options.map((option, index) => {
-                      const isSelected = selectedAnswer === index
-                      const isCorrect = index === currentQuestion.correct
-                      const showResult = gameState === 'answer'
-                      
-                      let buttonClass = 'w-full p-4 text-left rounded-xl border-2 transition-all '
-                      
-                      if (showResult) {
-                        if (isCorrect) {
-                          buttonClass += 'border-green-500 bg-green-500/10 text-green-400'
-                        } else if (isSelected && !isCorrect) {
-                          buttonClass += 'border-red-500 bg-red-500/10 text-red-400'
-                        } else {
-                          buttonClass += 'border-muted bg-muted/50 opacity-50'
-                        }
-                      } else {
-                        buttonClass += 'border-muted hover:border-primary hover:bg-primary/5'
-                      }
-                      
-                      return (
-                        <motion.button
-                          key={index}
-                          whileHover={gameState === 'playing' ? { scale: 1.01 } : {}}
-                          whileTap={gameState === 'playing' ? { scale: 0.99 } : {}}
-                          onClick={() => gameState === 'playing' && handleAnswer(index)}
-                          disabled={gameState === 'answer'}
-                          className={buttonClass}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="h-8 w-8 rounded-full bg-muted flex items-center justify-center font-medium">
-                              {String.fromCharCode(65 + index)}
-                            </span>
-                            <span className="flex-1">{option}</span>
-                            {showResult && isCorrect && (
-                              <CheckCircle className="h-5 w-5 text-green-500" />
-                            )}
-                            {showResult && isSelected && !isCorrect && (
-                              <XCircle className="h-5 w-5 text-red-500" />
-                            )}
-                          </div>
-                        </motion.button>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Answer Explanation */}
-              {gameState === 'answer' && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        {selectedAnswer === currentQuestion.correct ? (
-                          <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0" />
-                        ) : (
-                          <XCircle className="h-6 w-6 text-red-500 flex-shrink-0" />
-                        )}
-                        <div>
-                          <p className="font-medium">
-                            {selectedAnswer === currentQuestion.correct ? 'Correct!' : 'Not quite!'}
-                          </p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {currentQuestion.explanation}
-                          </p>
-                        </div>
-                      </div>
-                      <Button onClick={nextQuestion} className="w-full mt-4">
-                        {currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'See Results'}
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-            </motion.div>
-          )}
-
-          {/* Result State */}
-          {gameState === 'result' && (
-            <motion.div
-              key="result"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center space-y-6"
-            >
-              <div className="inline-flex items-center justify-center h-24 w-24 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 mb-4">
-                <Trophy className="h-12 w-12 text-white" />
-              </div>
-              
-              <h1 className="text-4xl font-display font-bold">Game Complete!</h1>
-              
-              <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-3xl font-bold text-green-400">{score}</p>
-                    <p className="text-xs text-muted-foreground">Correct</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-3xl font-bold text-purple-400">+{xpEarned}</p>
-                    <p className="text-xs text-muted-foreground">XP Earned</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-3xl font-bold text-orange-400">{bestStreak}</p>
-                    <p className="text-xs text-muted-foreground">Best Streak</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Answer Summary */}
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex justify-center gap-2">
-                    {answers.map((correct, i) => (
-                      <div
-                        key={i}
-                        className={`h-3 w-3 rounded-full ${correct ? 'bg-green-500' : 'bg-red-500'}`}
-                      />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex gap-4 justify-center">
-                <Button variant="outline" onClick={() => setGameState('menu')}>
-                  <RotateCcw className="h-4 w-4 mr-2" />
+              {/* Actions */}
+              <div className="space-y-3 pt-4">
+                <Button onClick={fetchQuestions} className="w-full" size="lg">
+                  <RotateCcw className="w-5 h-5 mr-2" />
                   Play Again
                 </Button>
-                <Button onClick={() => startGame(selectedCategory)}>
-                  Same Category
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                <Button onClick={restartGame} variant="outline" className="w-full" size="lg">
+                  Change Category
                 </Button>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return null
 }
