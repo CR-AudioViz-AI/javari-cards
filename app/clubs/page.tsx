@@ -17,6 +17,7 @@ import {
   Loader2,
   Lock,
   Check,
+  Star,
 } from 'lucide-react'
 
 interface Club {
@@ -31,11 +32,12 @@ interface Club {
   banner_emoji: string
   banner_color: string
   requirement: string
+  owner_id: string
   created_at: string
-  owner: {
+  owner?: {
     full_name: string
     avatar_url: string
-  }
+  } | null
 }
 
 const CLUB_TYPES = [
@@ -53,14 +55,17 @@ export default function ClubsPage() {
   const { user, loading: authLoading } = useAuth()
   
   const [clubs, setClubs] = useState<Club[]>([])
+  const [myClubs, setMyClubs] = useState<Club[]>([])
   const [loading, setLoading] = useState(true)
-  const [userClubs, setUserClubs] = useState<string[]>([])
+  const [userClubIds, setUserClubIds] = useState<string[]>([])
   
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedType, setSelectedType] = useState('all')
 
   useEffect(() => {
     const init = async () => {
+      await fetchClubs()
+      
       if (user) {
         // Get user's club memberships
         const { data: memberships } = await supabase
@@ -68,10 +73,17 @@ export default function ClubsPage() {
           .select('club_id')
           .eq('user_id', user.id)
         
-        setUserClubs(memberships?.map(m => m.club_id) || [])
+        setUserClubIds(memberships?.map(m => m.club_id) || [])
+        
+        // Get clubs the user owns
+        const { data: ownedClubs } = await supabase
+          .from('clubs')
+          .select('*')
+          .eq('owner_id', user.id)
+          .order('created_at', { ascending: false })
+        
+        setMyClubs(ownedClubs || [])
       }
-      
-      await fetchClubs()
     }
     
     init()
@@ -80,12 +92,10 @@ export default function ClubsPage() {
   const fetchClubs = async () => {
     setLoading(true)
     try {
+      // Fetch clubs without the problematic join first
       let query = supabase
         .from('clubs')
-        .select(`
-          *,
-          owner:profiles!owner_id(full_name, avatar_url)
-        `)
+        .select('*')
         .eq('is_private', false)
         .order('member_count', { ascending: false })
       
@@ -101,9 +111,26 @@ export default function ClubsPage() {
       
       if (error) throw error
       
-      setClubs(data || [])
+      // Now fetch owner profiles separately to avoid join issues
+      const clubsWithOwners = await Promise.all(
+        (data || []).map(async (club) => {
+          const { data: ownerData } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', club.owner_id)
+            .single()
+          
+          return {
+            ...club,
+            owner: ownerData || null
+          }
+        })
+      )
+      
+      setClubs(clubsWithOwners)
     } catch (error) {
       console.error('Error fetching clubs:', error)
+      setClubs([])
     } finally {
       setLoading(false)
     }
@@ -130,7 +157,7 @@ export default function ClubsPage() {
       
       if (error) throw error
       
-      setUserClubs([...userClubs, clubId])
+      setUserClubIds([...userClubIds, clubId])
       fetchClubs()
     } catch (error) {
       console.error('Error joining club:', error)
@@ -147,6 +174,9 @@ export default function ClubsPage() {
     return found?.color || 'from-gray-500 to-gray-600'
   }
 
+  const isMember = (clubId: string) => userClubIds.includes(clubId)
+  const isOwner = (club: Club) => user && club.owner_id === user.id
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 py-8">
       <div className="max-w-7xl mx-auto px-4">
@@ -157,7 +187,6 @@ export default function ClubsPage() {
             <p className="text-gray-400">Join communities of collectors who share your passion</p>
           </div>
           
-          {/* Show Create Club button if logged in */}
           {user && (
             <Link
               href="/clubs/create"
@@ -168,6 +197,44 @@ export default function ClubsPage() {
             </Link>
           )}
         </div>
+
+        {/* My Clubs Section */}
+        {user && myClubs.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Star className="w-5 h-5 text-yellow-500" />
+              My Clubs
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {myClubs.map((club) => {
+                const TypeIcon = getTypeIcon(club.club_type)
+                
+                return (
+                  <Link
+                    key={club.id}
+                    href={`/clubs/${club.slug}`}
+                    className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl border border-purple-500/30 overflow-hidden hover:border-purple-500/50 transition"
+                  >
+                    <div className={`h-16 bg-gradient-to-r ${getTypeColor(club.club_type)} flex items-center justify-center`}>
+                      <span className="text-3xl">{club.banner_emoji}</span>
+                    </div>
+                    <div className="p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold text-white">{club.name}</h3>
+                        {club.is_private && <Lock className="w-4 h-4 text-gray-500" />}
+                        <span className="text-xs px-2 py-0.5 bg-purple-500/30 text-purple-300 rounded">Owner</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-gray-400">
+                        <Users className="w-4 h-4" />
+                        {club.member_count} members
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800 mb-8">
@@ -235,80 +302,93 @@ export default function ClubsPage() {
 
         {/* Clubs Grid */}
         {!loading && clubs.length > 0 && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {clubs.map((club) => {
-              const TypeIcon = getTypeIcon(club.club_type)
-              const isMember = userClubs.includes(club.id)
-              
-              return (
-                <div
-                  key={club.id}
-                  className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden hover:border-purple-500/50 transition"
-                >
-                  {/* Banner */}
-                  <div className={`h-24 bg-gradient-to-r ${getTypeColor(club.club_type)} flex items-center justify-center`}>
-                    <span className="text-5xl">{club.banner_emoji}</span>
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-lg font-bold text-white">{club.name}</h3>
-                          {club.is_verified && (
-                            <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                              <Check className="w-3 h-3 text-white" />
-                            </div>
-                          )}
-                          {club.is_private && (
-                            <Lock className="w-4 h-4 text-gray-500" />
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                          <TypeIcon className="w-4 h-4" />
-                          <span className="capitalize">{club.club_type}</span>
-                        </div>
-                      </div>
+          <>
+            <h2 className="text-xl font-bold text-white mb-4">
+              {selectedType === 'all' ? 'All Clubs' : CLUB_TYPES.find(t => t.id === selectedType)?.name}
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {clubs.map((club) => {
+                const TypeIcon = getTypeIcon(club.club_type)
+                const memberStatus = isMember(club.id)
+                const ownerStatus = isOwner(club)
+                
+                return (
+                  <div
+                    key={club.id}
+                    className="bg-gray-900/50 rounded-xl border border-gray-800 overflow-hidden hover:border-purple-500/50 transition"
+                  >
+                    {/* Banner */}
+                    <div className={`h-24 bg-gradient-to-r ${getTypeColor(club.club_type)} flex items-center justify-center`}>
+                      <span className="text-5xl">{club.banner_emoji}</span>
                     </div>
                     
-                    <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                      {club.description}
-                    </p>
-                    
-                    {club.requirement && (
-                      <div className="text-xs text-gray-500 mb-4 px-2 py-1 bg-gray-800/50 rounded inline-block">
-                        📋 {club.requirement}
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm text-gray-400">
-                        <Users className="w-4 h-4" />
-                        {club.member_count.toLocaleString()} members
+                    {/* Content */}
+                    <div className="p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="text-lg font-bold text-white">{club.name}</h3>
+                            {club.is_verified && (
+                              <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                <Check className="w-3 h-3 text-white" />
+                              </div>
+                            )}
+                            {club.is_private && (
+                              <Lock className="w-4 h-4 text-gray-500" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-400">
+                            <TypeIcon className="w-4 h-4" />
+                            <span className="capitalize">{club.club_type}</span>
+                          </div>
+                        </div>
                       </div>
                       
-                      {isMember ? (
-                        <Link
-                          href={`/clubs/${club.slug}`}
-                          className="px-4 py-2 bg-purple-600/20 text-purple-400 rounded-lg text-sm font-medium"
-                        >
-                          View Club
-                        </Link>
-                      ) : (
-                        <button
-                          onClick={() => joinClub(club.id)}
-                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition"
-                        >
-                          Join
-                        </button>
+                      <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                        {club.description || 'No description yet.'}
+                      </p>
+                      
+                      {club.requirement && (
+                        <div className="text-xs text-gray-500 mb-4 px-2 py-1 bg-gray-800/50 rounded inline-block">
+                          📋 {club.requirement}
+                        </div>
                       )}
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm text-gray-400">
+                          <Users className="w-4 h-4" />
+                          {club.member_count.toLocaleString()} member{club.member_count !== 1 ? 's' : ''}
+                        </div>
+                        
+                        {ownerStatus ? (
+                          <Link
+                            href={`/clubs/${club.slug}`}
+                            className="px-4 py-2 bg-purple-600/20 text-purple-400 rounded-lg text-sm font-medium"
+                          >
+                            Manage
+                          </Link>
+                        ) : memberStatus ? (
+                          <Link
+                            href={`/clubs/${club.slug}`}
+                            className="px-4 py-2 bg-purple-600/20 text-purple-400 rounded-lg text-sm font-medium"
+                          >
+                            View Club
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => joinClub(club.id)}
+                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition"
+                          >
+                            Join
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          </>
         )}
 
         {/* Create CTA - Only show if NOT logged in */}
