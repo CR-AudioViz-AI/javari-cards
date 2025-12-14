@@ -124,8 +124,9 @@ export default function MuseumPage() {
     setError(null)
 
     try {
+      // FIXED: Using correct table name cv_history_articles
       let query = supabase
-        .from('card_history')
+        .from('cv_history_articles')
         .select('*')
         .order('year', { ascending: true })
 
