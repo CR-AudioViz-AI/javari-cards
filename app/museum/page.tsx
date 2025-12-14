@@ -6,112 +6,63 @@ import {
   Landmark,
   Clock,
   Trophy,
-  Star,
   ChevronRight,
   BookOpen,
   Sparkles,
-  TrendingUp,
   Calendar,
   Loader2,
   Filter,
+  Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createClient } from '@/lib/supabase'
 import GlobalHeader from '@/components/GlobalHeader'
 
-// Types
-interface HistoryEvent {
+// Types matching cv_history_articles table
+interface HistoryArticle {
   id: string
   title: string
-  year: number
-  category: string
+  slug: string
   content: string
-  image_url?: string
-  significance: 'low' | 'medium' | 'high' | 'legendary'
+  category: string
+  era: string
+  featured_image_url?: string
+  author: string
+  view_count: number
+  is_featured: boolean
+  is_published: boolean
+  published_at: string
+  created_at: string
 }
-
-// Static Eras data (for timeline context)
-const ERAS = [
-  {
-    id: 'tobacco',
-    name: 'Tobacco Card Era',
-    years: '1880s-1945',
-    icon: '🚬',
-    color: 'from-amber-700 to-amber-500',
-    description: 'The birth of trading cards as tobacco company inserts.',
-    yearRange: [1880, 1945],
-  },
-  {
-    id: 'postwar',
-    name: 'Post-War Boom',
-    years: '1945-1980',
-    icon: '⚾',
-    color: 'from-blue-600 to-blue-400',
-    description: 'Topps establishes dominance. Modern card design emerges.',
-    yearRange: [1945, 1980],
-  },
-  {
-    id: 'junkwax',
-    name: 'Junk Wax Era',
-    years: '1986-1993',
-    icon: '📦',
-    color: 'from-gray-600 to-gray-400',
-    description: 'Mass production era that flooded the market.',
-    yearRange: [1986, 1993],
-  },
-  {
-    id: 'modern',
-    name: 'Modern Era',
-    years: '1993-2010',
-    icon: '✨',
-    color: 'from-purple-600 to-pink-500',
-    description: 'Innovation with inserts, parallels, and memorabilia cards.',
-    yearRange: [1993, 2010],
-  },
-  {
-    id: 'investment',
-    name: 'Investment Era',
-    years: '2010-Present',
-    icon: '📈',
-    color: 'from-green-600 to-emerald-500',
-    description: 'Cards become alternative investments.',
-    yearRange: [2010, 2100],
-  },
-]
 
 const CATEGORIES = [
   { id: 'all', name: 'All History', icon: '📚' },
   { id: 'pokemon', name: 'Pokemon', icon: '⚡' },
   { id: 'sports', name: 'Sports Cards', icon: '⚾' },
+  { id: 'baseball', name: 'Baseball', icon: '⚾' },
+  { id: 'basketball', name: 'Basketball', icon: '🏀' },
   { id: 'tcg', name: 'TCG/MTG', icon: '🎴' },
   { id: 'grading', name: 'Grading', icon: '🏆' },
   { id: 'market', name: 'Market', icon: '📈' },
   { id: 'general', name: 'General', icon: '📜' },
 ]
 
-function getSignificanceBadge(significance: string) {
-  const styles = {
-    legendary: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50',
-    high: 'bg-purple-500/20 text-purple-400 border-purple-500/50',
-    medium: 'bg-blue-500/20 text-blue-400 border-blue-500/50',
-    low: 'bg-gray-500/20 text-gray-400 border-gray-500/50',
-  }
-  return styles[significance as keyof typeof styles] || styles.medium
-}
-
-function getEraForYear(year: number) {
-  return ERAS.find(era => year >= era.yearRange[0] && year <= era.yearRange[1])
+function getEraColor(era: string) {
+  if (era.includes('18')) return 'bg-amber-500/20 text-amber-400 border-amber-500/50'
+  if (era.includes('194') || era.includes('195') || era.includes('196')) return 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+  if (era.includes('197') || era.includes('198')) return 'bg-purple-500/20 text-purple-400 border-purple-500/50'
+  if (era.includes('199')) return 'bg-pink-500/20 text-pink-400 border-pink-500/50'
+  if (era.includes('200') || era.includes('201') || era.includes('202')) return 'bg-green-500/20 text-green-400 border-green-500/50'
+  return 'bg-gray-500/20 text-gray-400 border-gray-500/50'
 }
 
 export default function MuseumPage() {
-  const [events, setEvents] = useState<HistoryEvent[]>([])
+  const [articles, setArticles] = useState<HistoryArticle[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [selectedEra, setSelectedEra] = useState<string | null>(null)
 
   const supabase = createClient()
 
@@ -124,11 +75,11 @@ export default function MuseumPage() {
     setError(null)
 
     try {
-      // FIXED: Using correct table name cv_history_articles
       let query = supabase
         .from('cv_history_articles')
         .select('*')
-        .order('year', { ascending: true })
+        .eq('is_published', true)
+        .order('created_at', { ascending: false })
 
       if (selectedCategory !== 'all') {
         query = query.eq('category', selectedCategory)
@@ -138,7 +89,7 @@ export default function MuseumPage() {
 
       if (fetchError) throw fetchError
 
-      setEvents(data || [])
+      setArticles(data || [])
     } catch (err) {
       console.error('Error fetching history:', err)
       setError('Failed to load museum content. Please try again.')
@@ -147,21 +98,13 @@ export default function MuseumPage() {
     }
   }
 
-  // Filter events by era if selected
-  const filteredEvents = selectedEra
-    ? events.filter(event => {
-        const era = ERAS.find(e => e.id === selectedEra)
-        return era && event.year >= era.yearRange[0] && event.year <= era.yearRange[1]
-      })
-    : events
-
-  // Group events by decade for timeline view
-  const eventsByDecade = filteredEvents.reduce((acc, event) => {
-    const decade = Math.floor(event.year / 10) * 10
-    if (!acc[decade]) acc[decade] = []
-    acc[decade].push(event)
+  // Group by era
+  const articlesByEra = articles.reduce((acc, article) => {
+    const era = article.era || 'Unknown'
+    if (!acc[era]) acc[era] = []
+    acc[era].push(article)
     return acc
-  }, {} as Record<number, HistoryEvent[]>)
+  }, {} as Record<string, HistoryArticle[]>)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -202,47 +145,15 @@ export default function MuseumPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-amber-400" />
-                <span>{events.length} Historic Events</span>
+                <span>{articles.length} Articles</span>
               </div>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Era Timeline */}
-      <section className="py-8 border-y border-gray-800 bg-gray-900/50">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="w-5 h-5 text-amber-400" />
-            <h2 className="text-lg font-semibold text-white">Filter by Era</h2>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={selectedEra === null ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedEra(null)}
-              className={selectedEra === null ? 'bg-amber-500 hover:bg-amber-600' : ''}
-            >
-              All Eras
-            </Button>
-            {ERAS.map(era => (
-              <Button
-                key={era.id}
-                variant={selectedEra === era.id ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedEra(era.id)}
-                className={selectedEra === era.id ? `bg-gradient-to-r ${era.color}` : ''}
-              >
-                {era.icon} {era.name} ({era.years})
-              </Button>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Category Filter */}
-      <section className="py-6 bg-gray-900/30">
+      <section className="py-6 bg-gray-900/30 border-y border-gray-800">
         <div className="container mx-auto px-4">
           <div className="flex items-center gap-2 mb-4">
             <Filter className="w-5 h-5 text-amber-400" />
@@ -280,87 +191,85 @@ export default function MuseumPage() {
                 Try Again
               </Button>
             </div>
-          ) : filteredEvents.length === 0 ? (
+          ) : articles.length === 0 ? (
             <div className="text-center py-20">
               <Landmark className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">No Events Found</h3>
+              <h3 className="text-xl font-semibold text-white mb-2">No Articles Found</h3>
               <p className="text-gray-400 mb-4">
-                {selectedCategory !== 'all' || selectedEra
-                  ? 'Try adjusting your filters to see more content.'
+                {selectedCategory !== 'all'
+                  ? 'Try selecting a different category.'
                   : 'The museum is being curated. Check back soon!'}
               </p>
-              {(selectedCategory !== 'all' || selectedEra) && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedCategory('all')
-                    setSelectedEra(null)
-                  }}
-                >
-                  Clear Filters
+              {selectedCategory !== 'all' && (
+                <Button variant="outline" onClick={() => setSelectedCategory('all')}>
+                  View All
                 </Button>
               )}
             </div>
           ) : (
             <div className="space-y-12">
-              {Object.entries(eventsByDecade)
-                .sort(([a], [b]) => Number(a) - Number(b))
-                .map(([decade, decadeEvents]) => (
-                  <div key={decade}>
+              {Object.entries(articlesByEra)
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([era, eraArticles]) => (
+                  <div key={era}>
                     <div className="flex items-center gap-4 mb-6">
                       <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-black font-bold px-4 py-2 rounded-lg">
-                        {decade}s
+                        {era}
                       </div>
                       <div className="h-px flex-1 bg-gradient-to-r from-amber-500/50 to-transparent" />
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {decadeEvents.map((event, index) => {
-                        const era = getEraForYear(event.year)
-                        return (
-                          <motion.div
-                            key={event.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.1 }}
-                          >
-                            <Card className="bg-gray-800/50 border-gray-700 hover:border-amber-500/50 transition-all h-full">
-                              <CardHeader className="pb-2">
-                                <div className="flex items-start justify-between">
-                                  <Badge variant="outline" className="bg-gray-700/50 text-amber-400">
-                                    {event.year}
+                      {eraArticles.map((article, index) => (
+                        <motion.div
+                          key={article.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                        >
+                          <Card className="bg-gray-800/50 border-gray-700 hover:border-amber-500/50 transition-all h-full">
+                            {article.featured_image_url && (
+                              <div className="aspect-video relative overflow-hidden rounded-t-lg">
+                                <img
+                                  src={article.featured_image_url}
+                                  alt={article.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
+                            <CardHeader className="pb-2">
+                              <div className="flex items-start justify-between">
+                                <Badge variant="outline" className={getEraColor(article.era)}>
+                                  {article.era}
+                                </Badge>
+                                {article.is_featured && (
+                                  <Badge className="bg-amber-500/20 text-amber-400">
+                                    ⭐ Featured
                                   </Badge>
-                                  <Badge
-                                    variant="outline"
-                                    className={getSignificanceBadge(event.significance)}
-                                  >
-                                    {event.significance === 'legendary' && '⭐ '}
-                                    {event.significance.charAt(0).toUpperCase() + event.significance.slice(1)}
-                                  </Badge>
+                                )}
+                              </div>
+                              <CardTitle className="text-white mt-2">{article.title}</CardTitle>
+                              <CardDescription className="text-gray-400">
+                                By {article.author}
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-gray-300 text-sm leading-relaxed line-clamp-4">
+                                {article.content}
+                              </p>
+                              <div className="mt-4 flex items-center justify-between">
+                                <Badge variant="outline" className="text-xs capitalize">
+                                  {article.category}
+                                </Badge>
+                                <div className="flex items-center gap-1 text-xs text-gray-500">
+                                  <Eye className="w-3 h-3" />
+                                  {article.view_count}
                                 </div>
-                                <CardTitle className="text-white mt-2">{event.title}</CardTitle>
-                                <CardDescription className="text-gray-400">
-                                  {era && (
-                                    <span className="text-xs">
-                                      {era.icon} {era.name}
-                                    </span>
-                                  )}
-                                </CardDescription>
-                              </CardHeader>
-                              <CardContent>
-                                <p className="text-gray-300 text-sm leading-relaxed">
-                                  {event.content}
-                                </p>
-                                <div className="mt-4 flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs">
-                                    {event.category}
-                                  </Badge>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        )
-                      })}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
                     </div>
                   </div>
                 ))}
