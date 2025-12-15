@@ -1,121 +1,245 @@
 // ============================================================================
-// SPORTS CARDS API - MULTI-SOURCE INTEGRATION
+// SPORTS CARDS API - ENHANCED
+// Uses TheSportsDB free API for athlete data + local database for user cards
+// Covers: MLB, NBA, NFL, NHL, Soccer, and more
 // CravCards - CR AudioViz AI, LLC
-// Created: December 12, 2025
+// Created: December 14, 2025
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase
+const SPORTSDB_API = 'https://www.thesportsdb.com/api/v1/json/3';
+
+// Initialize Supabase for user-submitted cards
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Sports cards don't have a universal free API like Pokemon/MTG
-// Strategy: Use our seeded database + allow user submissions + eBay completed listings
-// Future: Integrate SportsCardsPro API when budget allows ($99/month)
-
-interface SportsCardSearch {
-  query: string;
-  sport?: 'baseball' | 'basketball' | 'football' | 'hockey' | 'soccer';
-  year?: string;
-  manufacturer?: string;
-  player?: string;
+interface SportsDBPlayer {
+  idPlayer: string;
+  strPlayer: string;
+  strTeam: string;
+  strSport: string;
+  strPosition: string;
+  strNationality: string;
+  dateBorn: string;
+  strThumb: string;
+  strCutout: string;
+  strStatus: string;
+  strGender: string;
+  strDescriptionEN?: string;
+  strHeight?: string;
+  strWeight?: string;
 }
 
-// GET - Search sports cards from database + external sources
+// Sport to category mapping
+const SPORT_CATEGORIES: Record<string, string> = {
+  'Baseball': 'sports_baseball',
+  'Basketball': 'sports_basketball',
+  'American Football': 'sports_football',
+  'Ice Hockey': 'sports_hockey',
+  'Soccer': 'sports_soccer',
+  'Golf': 'sports_golf',
+  'Tennis': 'sports_tennis',
+  'Boxing': 'sports_boxing',
+  'MMA': 'sports_mma',
+  'Motorsport': 'sports_racing',
+};
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get('q');
-  const sport = searchParams.get('sport');
-  const year = searchParams.get('year');
-  const manufacturer = searchParams.get('manufacturer');
+  const query = searchParams.get('q') || searchParams.get('query') || '';
+  const sport = searchParams.get('sport'); // baseball, basketball, football, hockey, soccer
+  const team = searchParams.get('team');
   const page = parseInt(searchParams.get('page') || '1');
   const pageSize = parseInt(searchParams.get('pageSize') || '20');
-  const type = searchParams.get('type'); // sets, cards
+
+  if (!query && !team) {
+    return NextResponse.json({
+      success: false,
+      error: 'Search query required. Use ?q=player_name or ?team=team_name',
+      examples: [
+        '/api/sports?q=pete%20rose',
+        '/api/sports?q=michael%20jordan',
+        '/api/sports?q=tom%20brady',
+        '/api/sports?team=yankees',
+      ],
+      sports: ['baseball', 'basketball', 'football', 'hockey', 'soccer'],
+    });
+  }
 
   try {
-    // List all sports sets
-    if (type === 'sets') {
-      let setsQuery = supabase
-        .from('card_sets')
-        .select('*')
-        .like('category', 'sports%')
-        .order('release_year', { ascending: false });
+    const allCards: any[] = [];
 
-      if (sport) {
-        setsQuery = setsQuery.eq('category', `sports_${sport}`);
-      }
-
-      const { data: sets, error } = await setsQuery;
-
-      if (error) throw error;
-
-      return NextResponse.json({
-        success: true,
-        sets: sets || [],
-        totalCount: sets?.length || 0,
-      });
-    }
-
-    // Search cards from database
-    let cardsQuery = supabase
-      .from('card_catalog')
-      .select('*', { count: 'exact' })
-      .like('category', 'sports%');
-
+    // 1. Search TheSportsDB for athletes
     if (query) {
-      cardsQuery = cardsQuery.ilike('name', `%${query}%`);
+      const sportsDbResponse = await fetch(
+        `${SPORTSDB_API}/searchplayers.php?p=${encodeURIComponent(query)}`,
+        { next: { revalidate: 3600 } }
+      );
+
+      if (sportsDbResponse.ok) {
+        const sportsData = await sportsDbResponse.json();
+        const players: SportsDBPlayer[] = sportsData.player || [];
+
+        // Filter by sport if specified
+        const filteredPlayers = sport
+          ? players.filter(p => p.strSport.toLowerCase().includes(sport.toLowerCase()))
+          : players;
+
+        // Transform athletes to "virtual cards"
+        const athleteCards = filteredPlayers.map(player => {
+          const sportCategory = SPORT_CATEGORIES[player.strSport] || 'sports_other';
+          const birthYear = player.dateBorn ? new Date(player.dateBorn).getFullYear() : null;
+          
+          // Create virtual card representing this athlete
+          // Users can have cards from any year/set of this player
+          return {
+            id: `athlete-${player.idPlayer}`,
+            name: player.strPlayer,
+            category: sportCategory,
+            type: 'athlete',
+            
+            // Player info
+            team: player.strTeam?.replace('_Retired ', '') || 'Free Agent',
+            sport: player.strSport,
+            position: player.strPosition || 'N/A',
+            nationality: player.strNationality,
+            birth_year: birthYear,
+            status: player.strStatus,
+            
+            // Bio
+            description: player.strDescriptionEN?.slice(0, 300) || null,
+            height: player.strHeight,
+            weight: player.strWeight,
+
+            // This is a placeholder - real cards would have set info
+            set_name: `${player.strPlayer} Cards`,
+            card_number: 'Various',
+            rarity: 'Various',
+
+            // Images from SportsDB
+            image_url: player.strThumb || player.strCutout || null,
+            image_large: player.strCutout || player.strThumb || null,
+
+            // Price placeholder - would need integration with PSA, eBay, etc.
+            market_price: null,
+            
+            // Metadata
+            source: 'TheSportsDB',
+            note: 'Search for specific cards of this player in your collection',
+            
+            // For sports, we track the athlete
+            athlete_id: player.idPlayer,
+          };
+        });
+
+        allCards.push(...athleteCards);
+      }
     }
 
-    if (sport) {
-      cardsQuery = cardsQuery.eq('category', `sports_${sport}`);
+    // 2. Search team players if team specified
+    if (team) {
+      // First find the team
+      const teamResponse = await fetch(
+        `${SPORTSDB_API}/searchteams.php?t=${encodeURIComponent(team)}`,
+        { next: { revalidate: 3600 } }
+      );
+
+      if (teamResponse.ok) {
+        const teamData = await teamResponse.json();
+        const teams = teamData.teams || [];
+
+        if (teams.length > 0) {
+          const teamId = teams[0].idTeam;
+          
+          // Get players for this team
+          const playersResponse = await fetch(
+            `${SPORTSDB_API}/lookup_all_players.php?id=${teamId}`,
+            { next: { revalidate: 3600 } }
+          );
+
+          if (playersResponse.ok) {
+            const playersData = await playersResponse.json();
+            const teamPlayers: SportsDBPlayer[] = playersData.player || [];
+
+            const teamCards = teamPlayers.slice(0, 30).map(player => ({
+              id: `athlete-${player.idPlayer}`,
+              name: player.strPlayer,
+              category: SPORT_CATEGORIES[player.strSport] || 'sports_other',
+              type: 'athlete',
+              team: player.strTeam,
+              sport: player.strSport,
+              position: player.strPosition || 'N/A',
+              image_url: player.strThumb || player.strCutout || null,
+              source: 'TheSportsDB',
+              athlete_id: player.idPlayer,
+            }));
+
+            allCards.push(...teamCards);
+          }
+        }
+      }
     }
 
-    // Pagination
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-    cardsQuery = cardsQuery.range(from, to);
+    // 3. Also search our local database for user-submitted cards
+    if (query) {
+      try {
+        const { data: localCards } = await supabase
+          .from('cv_cards')
+          .select('*')
+          .or(`name.ilike.%${query}%,player_name.ilike.%${query}%`)
+          .eq('category', 'sports')
+          .limit(20);
 
-    const { data: cards, error, count } = await cardsQuery;
+        if (localCards && localCards.length > 0) {
+          const formattedLocal = localCards.map(card => ({
+            ...card,
+            source: 'CravCards Database',
+          }));
+          allCards.push(...formattedLocal);
+        }
+      } catch (dbError) {
+        console.log('Local DB search skipped:', dbError);
+      }
+    }
 
-    if (error) throw error;
+    // Deduplicate by athlete_id
+    const seen = new Set();
+    const uniqueCards = allCards.filter(card => {
+      const key = card.athlete_id || card.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
-    // Transform to consistent format
-    const transformedCards = (cards || []).map(card => ({
-      id: card.id,
-      name: card.name,
-      category: card.category,
-      set_name: card.set_name,
-      set_code: card.set_code,
-      card_number: card.card_number,
-      rarity: card.rarity,
-      type: card.type,
-      image_url: card.image_url,
-      market_price: card.avg_price,
-      source: 'database',
-    }));
+    // Paginate
+    const start = (page - 1) * pageSize;
+    const paginatedCards = uniqueCards.slice(start, start + pageSize);
 
     return NextResponse.json({
       success: true,
-      cards: transformedCards,
+      cards: paginatedCards,
+      query,
+      sport,
+      team,
       page,
       pageSize,
-      totalCount: count || 0,
-      totalPages: Math.ceil((count || 0) / pageSize),
-      note: 'Sports card data from CravCards database. Submit missing cards to grow the collection!',
+      totalCount: uniqueCards.length,
+      totalPages: Math.ceil(uniqueCards.length / pageSize),
+      sources: ['TheSportsDB', 'CravCards Database'],
+      note: 'Sports cards show athletes - add your specific cards (rookie, auto, etc.) to your collection',
     });
+
   } catch (error) {
     console.error('Sports API error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch sports data',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch sports cards',
+      cards: [],
+    }, { status: 500 });
   }
 }
 
@@ -126,56 +250,50 @@ export async function POST(request: NextRequest) {
     
     const {
       name,
-      sport,
+      player_name,
       year,
-      manufacturer,
       set_name,
       card_number,
-      player_name,
-      team,
+      manufacturer, // Topps, Panini, Upper Deck, etc.
       rarity,
-      type, // rookie, base, insert, autograph, relic
+      parallel,
+      auto,
+      memorabilia,
+      graded,
+      grade,
+      grading_company,
       image_url,
     } = body;
 
-    // Validate required fields
-    if (!name || !sport) {
-      return NextResponse.json(
-        { success: false, error: 'Name and sport are required' },
-        { status: 400 }
-      );
-    }
-
-    // Check for duplicates
-    const { data: existing } = await supabase
-      .from('card_catalog')
-      .select('id')
-      .eq('name', name)
-      .eq('set_name', set_name || '')
-      .eq('card_number', card_number || '')
-      .single();
-
-    if (existing) {
+    if (!player_name || !year) {
       return NextResponse.json({
         success: false,
-        error: 'This card already exists in the database',
-        existingId: existing.id,
-      }, { status: 409 });
+        error: 'player_name and year are required',
+      }, { status: 400 });
     }
 
-    // Insert new card
-    const { data: newCard, error } = await supabase
-      .from('card_catalog')
+    const cardName = name || `${year} ${manufacturer || ''} ${player_name} ${parallel || ''}`.trim();
+
+    const { data, error } = await supabase
+      .from('cv_cards')
       .insert({
-        name,
-        category: `sports_${sport}`,
-        set_name: set_name || `${year} ${manufacturer}`,
-        set_code: `${year?.slice(-2) || 'XX'}${manufacturer?.slice(0, 3).toUpperCase() || 'UNK'}`,
+        name: cardName,
+        player_name,
+        year: parseInt(year),
+        set_name,
         card_number,
-        rarity: rarity || 'base',
-        type: type || 'Base',
+        manufacturer,
+        category: 'sports',
+        rarity: rarity || 'Base',
+        parallel,
+        is_auto: auto || false,
+        is_memorabilia: memorabilia || false,
+        is_graded: graded || false,
+        grade,
+        grading_company,
         image_url,
         created_at: new Date().toISOString(),
+        submitted_by: 'community',
       })
       .select()
       .single();
@@ -184,74 +302,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      card: data,
       message: 'Card submitted successfully! Thank you for contributing.',
-      card: newCard,
     });
+
   } catch (error) {
     console.error('Sports card submission error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to submit card',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to submit card',
+    }, { status: 500 });
   }
 }
-
-// ============================================================================
-// EBAY COMPLETED LISTINGS SCRAPER (For price data)
-// Note: This would require eBay Browse API or web scraping
-// eBay Browse API: https://developer.ebay.com/api-docs/buy/browse/overview.html
-// Free tier: 5,000 calls/day
-// ============================================================================
-
-// Helper function - NOT exported (internal use only)
-async function getEbayPricesInternal(cardName: string, year?: string) {
-  // Placeholder for eBay integration
-  // Would return recent sold prices for valuation
-  return {
-    available: false,
-    message: 'eBay price integration coming soon',
-    cardName,
-    year,
-  };
-}
-
-// ============================================================================
-// SPORTS DATA PROVIDERS (For future integration)
-// ============================================================================
-
-/*
-FREE/AFFORDABLE SPORTS CARD APIs:
-
-1. SportsCardsPro API
-   - URL: https://www.sportscardspro.com/api
-   - Cost: $99/month
-   - Coverage: Most sports cards with prices
-   
-2. TCDB (Trading Card Database)
-   - URL: https://www.tcdb.com/
-   - Community-driven
-   - No official API but scrapable
-   
-3. eBay Browse API
-   - URL: https://developer.ebay.com/api-docs/buy/browse/overview.html
-   - Cost: Free (5000 calls/day)
-   - Real sold prices
-   
-4. Beckett API
-   - URL: https://www.beckett.com/
-   - Industry standard pricing
-   - Expensive, enterprise-focused
-   
-5. PSA Pop Report
-   - URL: https://www.psacard.com/pop
-   - Population reports for graded cards
-   - Scrapable, no official API
-
-RECOMMENDATION:
-- Start with eBay Browse API for real market prices
-- Use community submissions to build database
-- Add SportsCardsPro when revenue justifies $99/month
-*/
