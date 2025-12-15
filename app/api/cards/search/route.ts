@@ -4,12 +4,11 @@
 // - Pokemon TCG (pokemontcg.io) - 18,000+ cards
 // - Magic: The Gathering (Scryfall) - 27,000+ cards
 // - Yu-Gi-Oh (YGOProDeck) - 10,000+ cards
-// - Disney Lorcana (lorcana-api.com) - 1,000+ cards
+// - Disney Lorcana (via internal API) - 1,000+ cards
 // - Sports (TheSportsDB) - 100,000+ athletes
-// - Local Database (user submissions)
 // 
 // CravCards - CR AudioViz AI, LLC
-// Created: December 14, 2025
+// Updated: December 14, 2025
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,8 +19,12 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cravcards.com';
 const POKEMON_API = 'https://api.pokemontcg.io/v2/cards';
 const SCRYFALL_API = 'https://api.scryfall.com/cards/search';
 const YUGIOH_API = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
-const LORCANA_API = 'https://api.lorcana-api.com/cards/search';
 const SPORTSDB_API = 'https://www.thesportsdb.com/api/v1/json/3';
+
+// Lorcana full card list (cached)
+const LORCANA_API = 'https://api.lorcana-api.com/cards/all';
+let lorcanaCache: any[] | null = null;
+let lorcanaCacheTime = 0;
 
 interface SearchResult {
   id: string;
@@ -42,7 +45,7 @@ interface SearchResult {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || searchParams.get('query');
-  const category = searchParams.get('category')?.toLowerCase(); // pokemon, mtg, yugioh, lorcana, sports, all
+  const category = searchParams.get('category')?.toLowerCase();
   const limit = Math.min(parseInt(searchParams.get('limit') || '30'), 100);
 
   if (!query || query.length < 2) {
@@ -62,6 +65,7 @@ export async function GET(request: NextRequest) {
   const results: SearchResult[] = [];
   const errors: string[] = [];
   const sourcesSearched: Record<string, boolean> = {};
+  const queryLower = query.toLowerCase();
 
   // Determine which sources to search
   const searchAll = !category || category === 'all';
@@ -73,19 +77,16 @@ export async function GET(request: NextRequest) {
     sports: searchAll || category === 'sports',
   };
 
-  // Create all search promises
   const searchPromises: Promise<void>[] = [];
 
   // ============================================
-  // 1. POKEMON TCG API (pokemontcg.io)
+  // 1. POKEMON TCG API
   // ============================================
   if (shouldSearch.pokemon) {
     sourcesSearched.pokemon = true;
     searchPromises.push(
       fetch(`${POKEMON_API}?q=name:${encodeURIComponent(query)}*&pageSize=${limit}`, {
-        headers: {
-          'X-Api-Key': process.env.POKEMON_TCG_API_KEY || '',
-        },
+        headers: { 'X-Api-Key': process.env.POKEMON_TCG_API_KEY || '' },
       })
         .then(res => res.json())
         .then(data => {
@@ -94,8 +95,7 @@ export async function GET(request: NextRequest) {
             const prices = card.tcgplayer?.prices;
             const marketPrice = prices?.holofoil?.market || 
                                prices?.reverseHolofoil?.market || 
-                               prices?.normal?.market || 
-                               prices?.['1stEditionHolofoil']?.market || null;
+                               prices?.normal?.market || null;
 
             results.push({
               id: card.id,
@@ -193,40 +193,56 @@ export async function GET(request: NextRequest) {
   }
 
   // ============================================
-  // 4. DISNEY LORCANA (lorcana-api.com)
+  // 4. DISNEY LORCANA (fetch all, filter locally)
   // ============================================
   if (shouldSearch.lorcana) {
     sourcesSearched.lorcana = true;
     searchPromises.push(
-      fetch(`${LORCANA_API}?name=${encodeURIComponent(query)}`)
-        .then(res => res.ok ? res.json() : [])
-        .then(cards => {
-          const cardArray = Array.isArray(cards) ? cards : [];
-          cardArray.slice(0, limit).forEach((card: any) => {
-            const fullName = card.title ? `${card.name} - ${card.title}` : card.name;
-            results.push({
-              id: `lorcana-${card.id || card.set_id}-${card.set_num}`,
-              name: fullName,
-              category: 'lorcana',
-              set_name: card.set_name || 'Unknown Set',
-              card_number: card.set_num?.toString() || '',
-              rarity: card.rarity || 'Common',
-              image_url: card.image || '',
-              market_price: null, // Lorcana API doesn't include prices
-              source: 'Lorcana API',
-              type: card.type,
+      (async () => {
+        try {
+          // Cache Lorcana cards (they don't change often)
+          const now = Date.now();
+          if (!lorcanaCache || (now - lorcanaCacheTime) > 3600000) {
+            const res = await fetch(LORCANA_API);
+            if (res.ok) {
+              lorcanaCache = await res.json();
+              lorcanaCacheTime = now;
+            }
+          }
+
+          if (lorcanaCache) {
+            const filtered = lorcanaCache.filter((card: any) => {
+              const name = (card.Name || '').toLowerCase();
+              const title = (card.Title || '').toLowerCase();
+              return name.includes(queryLower) || title.includes(queryLower);
             });
-          });
-        })
-        .catch(err => {
+
+            filtered.slice(0, limit).forEach((card: any) => {
+              const fullName = card.Title ? `${card.Name} - ${card.Title}` : card.Name;
+              results.push({
+                id: `lorcana-${card.Set_Num}-${card.Card_Num}`,
+                name: fullName,
+                category: 'lorcana',
+                set_name: card.Set_Name || 'Unknown Set',
+                card_number: card.Card_Num?.toString() || '',
+                rarity: card.Rarity || 'Common',
+                image_url: card.Image || '',
+                market_price: null,
+                source: 'Lorcana API',
+                type: card.Type,
+              });
+            });
+          }
+        } catch (err) {
           console.error('Lorcana search error:', err);
           errors.push('Lorcana API error');
-        })
+        }
+      })()
     );
   }
 
   // ============================================
-  // 5. SPORTS CARDS (TheSportsDB Athletes)
+  // 5. SPORTS (TheSportsDB Athletes)
   // ============================================
   if (shouldSearch.sports) {
     sourcesSearched.sports = true;
@@ -236,7 +252,6 @@ export async function GET(request: NextRequest) {
         .then(data => {
           const players = data.player || [];
           players.slice(0, limit).forEach((player: any) => {
-            // Map sport to category
             const sportMap: Record<string, string> = {
               'Baseball': 'sports_baseball',
               'Basketball': 'sports_basketball',
@@ -275,26 +290,22 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Wait for all searches to complete
+  // Wait for all searches
   await Promise.allSettled(searchPromises);
 
-  // Sort results: prioritize exact matches, then by category diversity
+  // Sort results
   results.sort((a, b) => {
-    // Exact name match first
-    const aExact = a.name.toLowerCase() === query.toLowerCase() ? 0 : 1;
-    const bExact = b.name.toLowerCase() === query.toLowerCase() ? 0 : 1;
+    const aExact = a.name.toLowerCase() === queryLower ? 0 : 1;
+    const bExact = b.name.toLowerCase() === queryLower ? 0 : 1;
     if (aExact !== bExact) return aExact - bExact;
 
-    // Then starts with query
-    const aStarts = a.name.toLowerCase().startsWith(query.toLowerCase()) ? 0 : 1;
-    const bStarts = b.name.toLowerCase().startsWith(query.toLowerCase()) ? 0 : 1;
+    const aStarts = a.name.toLowerCase().startsWith(queryLower) ? 0 : 1;
+    const bStarts = b.name.toLowerCase().startsWith(queryLower) ? 0 : 1;
     if (aStarts !== bStarts) return aStarts - bStarts;
 
-    // Then alphabetically
     return a.name.localeCompare(b.name);
   });
 
-  // Limit total results
   const limitedResults = results.slice(0, limit);
 
   return NextResponse.json({
