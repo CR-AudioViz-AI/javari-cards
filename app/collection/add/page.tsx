@@ -1,6 +1,6 @@
 // ============================================================================
 // ADD CARD PAGE - MOBILE-FIRST COLLECTION MANAGEMENT
-// Search 45,000+ cards, scan with camera, add with your photo
+// Search 156,000+ cards, scan with camera, add with your photo
 // CravCards - CR AudioViz AI, LLC
 // Created: December 12, 2025
 // ============================================================================
@@ -220,6 +220,8 @@ export default function AddCardPage() {
   const getCategoryColor = (category: string) => {
     if (category.includes('pokemon')) return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
     if (category.includes('mtg')) return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+    if (category.includes('yugioh')) return 'bg-orange-500/20 text-orange-300 border-orange-500/30';
+    if (category.includes('lorcana')) return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
     if (category.includes('sports')) return 'bg-green-500/20 text-green-300 border-green-500/30';
     return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
   };
@@ -279,7 +281,7 @@ export default function AddCardPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search 45,000+ cards..."
+                placeholder="Search 156,000+ cards..."
                 className="w-full pl-12 pr-12 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 text-lg"
                 autoFocus
               />
@@ -307,7 +309,7 @@ export default function AddCardPage() {
                 Filter
               </button>
               
-              {['all', 'pokemon', 'mtg', 'sports'].map((cat) => (
+              {['all', 'pokemon', 'mtg', 'yugioh', 'lorcana', 'sports'].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setCategoryFilter(cat)}
@@ -317,7 +319,7 @@ export default function AddCardPage() {
                       : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
                   }`}
                 >
-                  {cat === 'all' ? 'All Cards' : cat === 'mtg' ? 'Magic' : cat}
+                  {cat === 'all' ? 'All Cards' : cat === 'mtg' ? 'Magic' : cat === 'yugioh' ? 'Yu-Gi-Oh' : cat === 'lorcana' ? 'Lorcana' : cat}
                 </button>
               ))}
             </div>
