@@ -48,7 +48,7 @@ async function searchPokemon(query: string): Promise<SearchResult[]> {
   try {
     const response = await fetchWithTimeout(
       `${POKEMON_API}?q=name:${encodeURIComponent(query)}*&pageSize=10`,
-      5000
+      12000  // Pokemon API is slow - needs 12 seconds
     );
     if (!response.ok) return [];
     
@@ -210,7 +210,7 @@ export async function GET(request: NextRequest) {
     const results = await Promise.race([
       Promise.allSettled(promises),
       new Promise<PromiseSettledResult<SearchResult[]>[]>((_, reject) => 
-        setTimeout(() => reject(new Error('timeout')), 8000)
+        setTimeout(() => reject(new Error('timeout')), 15000)  // 15 second global timeout
       )
     ]);
     
