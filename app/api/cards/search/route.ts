@@ -1,5 +1,6 @@
 // ============================================================================
-// UNIFIED CARD SEARCH API - SIMPLE & RELIABLE
+// UNIFIED CARD SEARCH API - FAST FIRST
+// Returns results as soon as ANY source responds
 // CravCards - CR AudioViz AI, LLC
 // Fixed: December 15, 2025
 // ============================================================================
@@ -21,11 +22,28 @@ interface SearchResult {
   sport?: string;
 }
 
-// Search Pokemon TCG
+// Helper function with timeout
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timeoutId: NodeJS.Timeout;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timeoutId = setTimeout(() => resolve(fallback), ms);
+  });
+  
+  return Promise.race([
+    promise.then(result => {
+      clearTimeout(timeoutId);
+      return result;
+    }),
+    timeoutPromise
+  ]);
+}
+
+// Search Pokemon TCG (fastest API ~3-5s)
 async function searchPokemon(query: string): Promise<SearchResult[]> {
   try {
-    const url = `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(query)}*&pageSize=10`;
-    const response = await fetch(url);
+    const response = await fetch(
+      `https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(query)}*&pageSize=10`
+    );
     if (!response.ok) return [];
     
     const data = await response.json();
@@ -40,17 +58,17 @@ async function searchPokemon(query: string): Promise<SearchResult[]> {
       market_price: card.cardmarket?.prices?.averageSellPrice || null,
       source: 'Pokemon TCG',
     }));
-  } catch (e) {
-    console.error('Pokemon search error:', e);
+  } catch {
     return [];
   }
 }
 
-// Search Magic: The Gathering (Scryfall)
+// Search Magic: The Gathering (fast API ~1-2s)
 async function searchMTG(query: string): Promise<SearchResult[]> {
   try {
-    const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=cards`;
-    const response = await fetch(url);
+    const response = await fetch(
+      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&unique=cards`
+    );
     if (!response.ok) return [];
     
     const data = await response.json();
@@ -65,17 +83,17 @@ async function searchMTG(query: string): Promise<SearchResult[]> {
       market_price: card.prices?.usd ? parseFloat(card.prices.usd) : null,
       source: 'Scryfall',
     }));
-  } catch (e) {
-    console.error('MTG search error:', e);
+  } catch {
     return [];
   }
 }
 
-// Search Yu-Gi-Oh
+// Search Yu-Gi-Oh (fast API ~1s)
 async function searchYuGiOh(query: string): Promise<SearchResult[]> {
   try {
-    const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=10&offset=0`;
-    const response = await fetch(url);
+    const response = await fetch(
+      `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(query)}&num=10&offset=0`
+    );
     if (!response.ok) return [];
     
     const data = await response.json();
@@ -88,21 +106,21 @@ async function searchYuGiOh(query: string): Promise<SearchResult[]> {
       set_name: card.card_sets?.[0]?.set_name || 'Yu-Gi-Oh',
       card_number: card.card_sets?.[0]?.set_code || '',
       rarity: card.card_sets?.[0]?.set_rarity || 'Common',
-      image_url: card.card_images?.[0]?.image_url_small || card.card_images?.[0]?.image_url || '',
+      image_url: card.card_images?.[0]?.image_url_small || '',
       market_price: card.card_prices?.[0]?.tcgplayer_price ? parseFloat(card.card_prices[0].tcgplayer_price) : null,
       source: 'YGOProDeck',
     }));
-  } catch (e) {
-    console.error('YuGiOh search error:', e);
+  } catch {
     return [];
   }
 }
 
-// Search Sports (TheSportsDB)
+// Search Sports (usually fast ~1-2s)
 async function searchSports(query: string): Promise<SearchResult[]> {
   try {
-    const url = `https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=${encodeURIComponent(query)}`;
-    const response = await fetch(url);
+    const response = await fetch(
+      `https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=${encodeURIComponent(query)}`
+    );
     if (!response.ok) return [];
     
     const data = await response.json();
@@ -114,10 +132,6 @@ async function searchSports(query: string): Promise<SearchResult[]> {
       'American Football': 'sports_football',
       'Ice Hockey': 'sports_hockey',
       'Soccer': 'sports_soccer',
-      'Golf': 'sports_golf',
-      'Tennis': 'sports_tennis',
-      'Boxing': 'sports_boxing',
-      'Fighting': 'sports_mma',
     };
     
     return data.player.slice(0, 10).map((player: any) => ({
@@ -134,14 +148,14 @@ async function searchSports(query: string): Promise<SearchResult[]> {
       team: player.strTeam || player.strSport,
       sport: player.strSport,
     }));
-  } catch (e) {
-    console.error('Sports search error:', e);
+  } catch {
     return [];
   }
 }
 
-// Main search handler
+// Main search handler - returns quickly with whatever results we get
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || searchParams.get('query');
   const category = searchParams.get('category')?.toLowerCase();
@@ -155,24 +169,32 @@ export async function GET(request: NextRequest) {
   }
 
   const searchAll = !category || category === 'all';
+  const TIMEOUT = 8000; // 8 second timeout per source
   
-  // Run all searches in parallel
+  // Run all searches in parallel with individual timeouts
   const [pokemonResults, mtgResults, yugiohResults, sportsResults] = await Promise.all([
-    (searchAll || category === 'pokemon') ? searchPokemon(query) : Promise.resolve([]),
-    (searchAll || category === 'mtg') ? searchMTG(query) : Promise.resolve([]),
-    (searchAll || category === 'yugioh') ? searchYuGiOh(query) : Promise.resolve([]),
-    (searchAll || category === 'sports' || category?.startsWith('sports_')) ? searchSports(query) : Promise.resolve([]),
+    (searchAll || category === 'pokemon') 
+      ? withTimeout(searchPokemon(query), TIMEOUT, []) 
+      : Promise.resolve([]),
+    (searchAll || category === 'mtg') 
+      ? withTimeout(searchMTG(query), TIMEOUT, []) 
+      : Promise.resolve([]),
+    (searchAll || category === 'yugioh') 
+      ? withTimeout(searchYuGiOh(query), TIMEOUT, []) 
+      : Promise.resolve([]),
+    (searchAll || category === 'sports' || category?.startsWith('sports_')) 
+      ? withTimeout(searchSports(query), TIMEOUT, []) 
+      : Promise.resolve([]),
   ]);
 
   // Combine all results
   let allResults = [...pokemonResults, ...mtgResults, ...yugiohResults, ...sportsResults];
 
-  // Sort: exact matches first, then starts-with, then contains
+  // Sort: exact matches first
   const queryLower = query.toLowerCase();
   allResults.sort((a, b) => {
     const aName = a.name.toLowerCase();
     const bName = b.name.toLowerCase();
-    
     if (aName === queryLower && bName !== queryLower) return -1;
     if (bName === queryLower && aName !== queryLower) return 1;
     if (aName.startsWith(queryLower) && !bName.startsWith(queryLower)) return -1;
@@ -181,6 +203,7 @@ export async function GET(request: NextRequest) {
   });
 
   const finalResults = allResults.slice(0, limit);
+  const responseTime = Date.now() - startTime;
 
   return NextResponse.json({
     success: true,
@@ -188,20 +211,14 @@ export async function GET(request: NextRequest) {
     results: finalResults,
     totalCount: allResults.length,
     returnedCount: finalResults.length,
+    responseTimeMs: responseTime,
     sources: {
       pokemon: pokemonResults.length > 0,
       mtg: mtgResults.length > 0,
       yugioh: yugiohResults.length > 0,
       sports: sportsResults.length > 0,
     },
-    coverage: {
-      pokemon: '18,000+ cards',
-      mtg: '27,000+ cards',
-      yugioh: '10,000+ cards',
-      sports: '100,000+ athletes',
-    },
   });
 }
 
-// Configure for longer timeout
-export const maxDuration = 30;
+export const maxDuration = 15;
