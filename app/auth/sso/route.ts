@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 /**
  * SSO Callback Handler
@@ -10,7 +11,7 @@ import { cookies } from 'next/headers'
  * 
  * URL: /auth/sso?access_token=xxx&refresh_token=xxx
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const accessToken = requestUrl.searchParams.get('access_token')
   const refreshToken = requestUrl.searchParams.get('refresh_token')
@@ -26,7 +27,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = createClient()
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
     // Set the session using the tokens from central auth
     const { data, error } = await supabase.auth.setSession({
@@ -43,29 +45,26 @@ export async function GET(request: Request) {
       return NextResponse.redirect(centralLoginUrl.toString())
     }
 
-    if (data.session) {
+    if (data.session && data.user) {
       // Session established successfully
       // Sync user profile if needed
-      const user = data.user
-      if (user) {
-        // Ensure profile exists in this app's context
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', user.id)
-          .single()
+      const { data: profile } = await supabase
+        .from('cv_profiles')
+        .select('id')
+        .eq('id', data.user.id)
+        .single()
 
-        if (!profile) {
-          // Create profile for this user
-          await supabase.from('profiles').upsert({
-            id: user.id,
-            email: user.email,
-            full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
-            avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-        }
+      if (!profile) {
+        // Create profile for this user
+        await supabase.from('cv_profiles').insert({
+          id: data.user.id,
+          email: data.user.email,
+          username: data.user.email?.split('@')[0] || 'user',
+          display_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'Collector',
+          avatar_url: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
       }
 
       // Redirect to intended destination
