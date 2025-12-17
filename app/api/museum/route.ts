@@ -1,352 +1,205 @@
 // ============================================================================
-// CARD MUSEUM & HISTORY API
-// Comprehensive educational content about trading card history
+// MUSEUM CONTENT API - Card History & Education
 // CravCards - CR AudioViz AI, LLC
-// Created: December 16, 2025
+// Created: December 2024
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 
 const MUSEUM_EXHIBITS = {
-  timeline: [
-    {
-      year: 1860,
-      era: 'Origins',
-      title: 'First Baseball Cards',
-      description: 'The earliest known baseball cards were team photographs produced during the Civil War era.',
-      image: '/museum/1860-baseball.jpg',
-      significance: 'Birth of the sports card industry',
-    },
-    {
-      year: 1886,
-      era: 'Tobacco Era',
-      title: 'Old Judge Cigarettes',
-      description: 'Goodwin & Company produced the first widely distributed baseball cards as tobacco inserts.',
-      image: '/museum/1886-old-judge.jpg',
-      significance: 'First mass-produced trading cards',
-    },
-    {
-      year: 1909,
-      era: 'Tobacco Era',
-      title: 'T206 Honus Wagner',
-      description: 'The most famous baseball card ever made. Wagner requested removal due to his opposition to tobacco.',
-      image: '/museum/1909-wagner.jpg',
-      significance: 'The "Holy Grail" of card collecting',
-      record_sale: '$6.6 million (2021)',
-    },
-    {
-      year: 1933,
-      era: 'Gum Era',
-      title: 'Goudey Gum Company',
-      description: 'Goudey revolutionized cards by packaging them with bubble gum instead of tobacco.',
-      image: '/museum/1933-goudey.jpg',
-      significance: 'Made cards accessible to children',
-    },
-    {
-      year: 1952,
-      era: 'Modern Era Begins',
-      title: 'Topps Mickey Mantle',
-      description: 'The 1952 Topps set established the modern baseball card format. Card #311 Mickey Mantle is the crown jewel.',
-      image: '/museum/1952-mantle.jpg',
-      significance: 'Most valuable post-war baseball card',
-      record_sale: '$12.6 million (2022)',
-    },
-    {
-      year: 1986,
-      era: 'Basketball Boom',
-      title: 'Fleer Michael Jordan RC',
-      description: 'The 1986-87 Fleer #57 Michael Jordan rookie card defined basketball card collecting.',
-      image: '/museum/1986-jordan.jpg',
-      significance: 'Most iconic basketball card ever',
-      record_sale: '$738,000 PSA 10 (2021)',
-    },
-    {
-      year: 1993,
-      era: 'TCG Revolution',
-      title: 'Magic: The Gathering Released',
-      description: 'Richard Garfield creates the first collectible trading card game, revolutionizing the hobby.',
-      image: '/museum/1993-mtg.jpg',
-      significance: 'Birth of the TCG genre',
-    },
-    {
-      year: 1996,
-      era: 'Pokémon Begins',
-      title: 'Pokémon TCG Japan Release',
-      description: 'Media Factory releases the Pokémon Trading Card Game in Japan, creating a global phenomenon.',
-      image: '/museum/1996-pokemon.jpg',
-      significance: 'Largest TCG in the world',
-    },
-    {
-      year: 1999,
-      era: 'Pokémon USA',
-      title: 'Pokémon Base Set English',
-      description: 'Wizards of the Coast releases the English Pokémon TCG. First Edition Charizard becomes legendary.',
-      image: '/museum/1999-charizard.jpg',
-      significance: 'Most recognized trading card',
-      record_sale: '$420,000 PSA 10 (2022)',
-    },
-    {
-      year: 2002,
-      era: 'Anime TCGs',
-      title: 'Yu-Gi-Oh! English Release',
-      description: 'Upper Deck releases Yu-Gi-Oh! in English, bringing anime card games to Western audiences.',
-      image: '/museum/2002-yugioh.jpg',
-      significance: 'Second-largest TCG globally',
-    },
-    {
-      year: 2020,
-      era: 'Modern Boom',
-      title: 'COVID Card Boom',
-      description: 'The pandemic sparked unprecedented interest in trading cards, breaking all price records.',
-      image: '/museum/2020-boom.jpg',
-      significance: 'Card values increased 200-500%',
-    },
-    {
-      year: 2023,
-      era: 'Disney Era',
-      title: 'Disney Lorcana Debuts',
-      description: 'Ravensburger launches Disney Lorcana, the first major new TCG from Disney.',
-      image: '/museum/2023-lorcana.jpg',
-      significance: 'Fastest-selling TCG debut ever',
-    },
-  ],
-
-  hallOfFame: [
-    {
-      id: 'hof-1',
-      name: '1952 Topps Mickey Mantle #311',
-      category: 'Sports',
-      description: 'The cornerstone of post-war baseball card collecting. Topps\' first major set established the standard card format still used today.',
-      estimated_value: '$5,000,000 - $12,600,000',
-      population_psa10: 3,
-      why_valuable: ['Iconic player', 'First major Topps set', 'High number (often damaged)', 'Beautiful design'],
-      image: '/museum/hof-mantle.jpg',
-    },
-    {
-      id: 'hof-2',
-      name: 'T206 Honus Wagner',
-      category: 'Sports',
-      description: 'The "Mona Lisa" of baseball cards. Wagner requested the card be pulled, creating extreme scarcity.',
-      estimated_value: '$3,000,000 - $7,250,000',
-      known_examples: 60,
-      why_valuable: ['Extreme rarity', 'Historical significance', 'Mystery of the pullback', 'Pre-war artifact'],
-      image: '/museum/hof-wagner.jpg',
-    },
-    {
-      id: 'hof-3',
-      name: 'Alpha Black Lotus',
-      category: 'MTG',
-      description: 'The most powerful and valuable Magic card ever printed. Provides three mana of any color for zero cost.',
-      estimated_value: '$100,000 - $540,000',
-      print_run: 1100,
-      why_valuable: ['Most powerful card ever', 'Reserved List', 'Alpha rarity', 'Game-defining'],
-      image: '/museum/hof-lotus.jpg',
-    },
-    {
-      id: 'hof-4',
-      name: '1st Edition Shadowless Charizard',
-      category: 'Pokemon',
-      description: 'The holy grail of Pokémon cards. The Fire-type dragon captured hearts of a generation.',
-      estimated_value: '$200,000 - $420,000',
-      population_psa10: 121,
-      why_valuable: ['Iconic Pokémon', '1st Edition', 'Shadowless variant', 'Nostalgic value'],
-      image: '/museum/hof-charizard.jpg',
-    },
-    {
-      id: 'hof-5',
-      name: 'Pikachu Illustrator',
-      category: 'Pokemon',
-      description: 'The rarest Pokémon card in existence. Only 39 were ever produced as contest prizes.',
-      estimated_value: '$900,000 - $5,275,000',
-      known_examples: 39,
-      why_valuable: ['Extreme rarity', 'Contest prize only', 'Unique artwork', 'PSA 10 = 1 exists'],
-      image: '/museum/hof-illustrator.jpg',
-    },
-    {
-      id: 'hof-6',
-      name: '1986-87 Fleer Michael Jordan RC #57',
-      category: 'Sports',
-      description: 'The greatest basketball player\'s rookie card. Defines basketball card collecting.',
-      estimated_value: '$50,000 - $738,000',
-      population_psa10: 316,
-      why_valuable: ['GOAT player', 'Beautiful design', 'First Fleer basketball', 'Cultural icon'],
-      image: '/museum/hof-jordan.jpg',
-    },
-    {
-      id: 'hof-7',
-      name: 'Tournament Black Luster Soldier',
-      category: 'Yu-Gi-Oh',
-      description: 'Given to the winner of the first ever Yu-Gi-Oh tournament in 1999. Only one exists.',
-      estimated_value: '$2,000,000+',
-      known_examples: 1,
-      why_valuable: ['One of one', 'Tournament prize', 'Historical significance', 'Stainless steel'],
-      image: '/museum/hof-bls.jpg',
-    },
-    {
-      id: 'hof-8',
-      name: '2009 Bowman Chrome Mike Trout Superfractor',
-      category: 'Sports',
-      description: 'The defining modern baseball card. The 1/1 Superfractor set the standard for prospect cards.',
-      estimated_value: '$3,900,000+',
-      known_examples: 1,
-      why_valuable: ['Best active player', '1/1 Superfractor', 'Modern era icon', 'Bowman Chrome prestige'],
-      image: '/museum/hof-trout.jpg',
-    },
-  ],
-
-  categories: {
-    pokemon: {
-      name: 'Pokémon TCG',
-      founded: 1996,
-      founder: 'Media Factory / Nintendo',
-      headquarters: 'Tokyo, Japan',
-      total_cards: '15,000+',
-      notable_sets: ['Base Set', 'Neo Genesis', 'Skyridge', 'Gold Star Series', 'Scarlet & Violet'],
-      interesting_facts: [
-        'Largest TCG in the world by revenue',
-        'Over 52 billion cards sold worldwide',
-        'Available in 13 languages',
-        'First TCG based on a video game',
-      ],
-    },
-    mtg: {
-      name: 'Magic: The Gathering',
-      founded: 1993,
-      founder: 'Richard Garfield / Wizards of the Coast',
-      headquarters: 'Renton, Washington',
-      total_cards: '27,000+',
-      notable_sets: ['Alpha/Beta/Unlimited', 'Arabian Nights', 'Legends', 'Reserved List'],
-      interesting_facts: [
-        'First collectible trading card game ever',
-        'Over 50 million players worldwide',
-        'Inspired the entire TCG industry',
-        'Has its own Pro Tour with $1M+ prizes',
-      ],
-    },
-    yugioh: {
-      name: 'Yu-Gi-Oh! TCG',
-      founded: 1999,
-      founder: 'Kazuki Takahashi / Konami',
-      headquarters: 'Tokyo, Japan',
-      total_cards: '12,000+',
-      notable_sets: ['Legend of Blue Eyes', 'Metal Raiders', 'Pharaoh\'s Servant', 'Ghosts From the Past'],
-      interesting_facts: [
-        'Guinness World Record: Most players at a TCG tournament',
-        'Based on a manga/anime series',
-        'No rotation - all cards legal in some format',
-        'Speed Duel format for faster games',
-      ],
-    },
-    sports: {
-      name: 'Sports Trading Cards',
-      founded: 1860,
-      major_producers: 'Topps, Panini, Upper Deck, Fanatics',
-      headquarters: 'Various',
-      notable_sets: ['1952 Topps', 'T206', '1986 Fleer', 'Bowman Chrome'],
-      interesting_facts: [
-        'Oldest form of trading cards',
-        'Baseball cards originally came in tobacco products',
-        'The "Junk Wax Era" (1987-1994) overproduced millions of cards',
-        'Fanatics acquired Topps in 2022 for $500M',
-      ],
-    },
-    lorcana: {
-      name: 'Disney Lorcana',
-      founded: 2023,
-      founder: 'Ravensburger',
-      headquarters: 'Ravensburg, Germany',
-      total_cards: '1,000+',
-      notable_sets: ['The First Chapter', 'Rise of the Floodborn', 'Into the Inklands', 'Ursula\'s Return'],
-      interesting_facts: [
-        'Fastest-selling new TCG in history',
-        'Sold out globally within hours of release',
-        'Uses Disney characters in unique art styles',
-        'Designed to be accessible to new players',
-      ],
-    },
+  pokemon: {
+    title: 'Pokemon Trading Card Game',
+    subtitle: 'From Japan to Global Phenomenon',
+    founded: '1996 (Japan), 1999 (US)',
+    timeline: [
+      { year: 1996, event: 'Pokemon TCG launches in Japan' },
+      { year: 1999, event: 'Base Set releases in United States' },
+      { year: 2000, event: 'Pokemon TCG becomes world\'s best-selling card game' },
+      { year: 2003, event: 'EX series introduces powerful EX Pokemon' },
+      { year: 2016, event: 'Pokemon GO causes massive resurgence in interest' },
+      { year: 2020, event: 'COVID-19 pandemic sparks collecting boom' },
+      { year: 2021, event: 'PSA 10 1st Edition Charizard sells for $420,000' },
+      { year: 2022, event: 'Celebrations 25th anniversary set released' },
+      { year: 2023, event: 'Scarlet & Violet era begins' },
+    ],
+    iconicCards: [
+      { name: 'Charizard - Base Set', year: 1999, value: '$300,000+ (PSA 10 1st Ed)', image: 'https://images.pokemontcg.io/base1/4.png', description: 'The most iconic Pokemon card ever printed' },
+      { name: 'Pikachu Illustrator', year: 1998, value: '$5,000,000+', image: 'https://images.pokemontcg.io/basep/1.png', description: 'Rarest Pokemon card - only 39 ever printed' },
+      { name: 'Shadowless Blastoise', year: 1999, value: '$50,000+ (PSA 10)', image: 'https://images.pokemontcg.io/base1/2.png', description: 'Early print variant highly sought after' },
+      { name: 'Gold Star Rayquaza', year: 2005, value: '$10,000+ (PSA 10)', image: 'https://images.pokemontcg.io/exdeoxys/107.png', description: 'One of the rarest modern Pokemon cards' },
+    ],
+    facts: [
+      'Over 52 billion Pokemon cards have been produced worldwide',
+      'The Pokemon TCG is available in 13 languages',
+      'There have been over 100 expansion sets released',
+      'The first Pokemon TCG World Championship was held in 2004',
+    ],
   },
+  mtg: {
+    title: 'Magic: The Gathering',
+    subtitle: 'The Original Trading Card Game',
+    founded: '1993',
+    timeline: [
+      { year: 1993, event: 'Richard Garfield creates Magic: The Gathering' },
+      { year: 1993, event: 'Alpha and Beta sets released' },
+      { year: 1994, event: 'Antiquities introduces artifacts focus' },
+      { year: 1995, event: 'Chronicles and Ice Age released' },
+      { year: 1996, event: 'Reserve List established to protect card values' },
+      { year: 2002, event: 'Magic Online launches' },
+      { year: 2018, event: 'MTG Arena brings game to new generation' },
+      { year: 2021, event: 'Alpha Black Lotus sells for $511,100' },
+      { year: 2023, event: 'Lord of the Rings crossover set released' },
+    ],
+    iconicCards: [
+      { name: 'Black Lotus', year: 1993, value: '$500,000+ (Alpha PSA 10)', image: 'https://cards.scryfall.io/normal/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg', description: 'Most powerful and valuable MTG card ever' },
+      { name: 'Ancestral Recall', year: 1993, value: '$80,000+ (Alpha)', image: 'https://cards.scryfall.io/normal/front/2/3/2398892d-28e9-4009-81ec-0d544af79d2b.jpg', description: 'Draw 3 cards for 1 blue mana' },
+      { name: 'Underground Sea', year: 1993, value: '$15,000+ (Alpha)', image: 'https://cards.scryfall.io/normal/front/2/6/26cee543-6eab-494e-a803-33a5d48d7d74.jpg', description: 'Original dual land, never to be reprinted' },
+      { name: 'Mox Sapphire', year: 1993, value: '$80,000+ (Alpha)', image: 'https://cards.scryfall.io/normal/front/e/a/ea1feac0-d3a7-45eb-9719-1cdebb0a9f62.jpg', description: 'Part of the Power Nine' },
+    ],
+    facts: [
+      'Over 20,000 unique cards have been printed',
+      'MTG is played in over 70 countries',
+      'The Pro Tour has awarded over $50 million in prizes',
+      'Richard Garfield holds a PhD in combinatorial mathematics',
+    ],
+  },
+  yugioh: {
+    title: 'Yu-Gi-Oh! Trading Card Game',
+    subtitle: 'It\'s Time to Duel!',
+    founded: '1999 (Japan), 2002 (US)',
+    timeline: [
+      { year: 1999, event: 'Yu-Gi-Oh! OCG launches in Japan' },
+      { year: 2000, event: 'Anime series begins airing' },
+      { year: 2002, event: 'TCG launches in North America' },
+      { year: 2002, event: 'Legend of Blue Eyes White Dragon released' },
+      { year: 2008, event: '5D\'s era introduces Synchro monsters' },
+      { year: 2011, event: 'Xyz monsters introduced' },
+      { year: 2017, event: 'Link Summoning mechanic added' },
+      { year: 2021, event: 'Tournament Black Luster Soldier sells for $2 million' },
+    ],
+    iconicCards: [
+      { name: 'Blue-Eyes White Dragon', year: 1999, value: '$50,000+ (LOB 1st Ed)', image: 'https://images.ygoprodeck.com/images/cards_small/89631139.jpg', description: 'Seto Kaiba\'s legendary dragon' },
+      { name: 'Dark Magician', year: 1999, value: '$10,000+ (LOB 1st Ed)', image: 'https://images.ygoprodeck.com/images/cards_small/46986414.jpg', description: 'Yugi\'s signature spellcaster' },
+      { name: 'Exodia the Forbidden One', year: 2002, value: '$5,000+ (LOB complete set)', image: 'https://images.ygoprodeck.com/images/cards_small/33396948.jpg', description: 'Instant win condition' },
+      { name: 'Tournament Black Luster Soldier', year: 1999, value: '$2,000,000+', image: 'https://images.ygoprodeck.com/images/cards_small/5405694.jpg', description: 'Rarest Yu-Gi-Oh card ever' },
+    ],
+    facts: [
+      'Over 35 billion Yu-Gi-Oh cards have been sold',
+      'Guinness World Record: Best-selling trading card game',
+      'The anime has aired over 900 episodes across all series',
+      'Over 10,000 unique cards exist in the TCG',
+    ],
+  },
+  sports: {
+    title: 'Sports Card Collecting',
+    subtitle: '150+ Years of Athletic Heroes',
+    founded: '1860s',
+    timeline: [
+      { year: 1868, event: 'First baseball cards produced (Peck & Snyder)' },
+      { year: 1909, event: 'T206 Honus Wagner card produced' },
+      { year: 1933, event: 'Goudey Gum produces first bubble gum cards' },
+      { year: 1952, event: 'Topps produces iconic Mickey Mantle card' },
+      { year: 1979, event: 'Wayne Gretzky O-Pee-Chee rookie released' },
+      { year: 1986, event: 'Fleer produces Michael Jordan rookie' },
+      { year: 1989, event: 'Upper Deck revolutionizes card quality' },
+      { year: 2020, event: 'Sports cards boom during pandemic' },
+      { year: 2022, event: 'T206 Wagner sells for $7.25 million' },
+    ],
+    iconicCards: [
+      { name: 'T206 Honus Wagner', year: 1909, value: '$7,250,000', image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2e/T206_Honus_Wagner.jpg/220px-T206_Honus_Wagner.jpg', description: 'The Holy Grail of sports cards' },
+      { name: '1952 Topps Mickey Mantle', year: 1952, value: '$12,600,000 (PSA 9)', image: 'https://upload.wikimedia.org/wikipedia/en/7/7a/1952_Topps_Mickey_Mantle.jpg', description: 'Most valuable post-war baseball card' },
+      { name: '1986 Fleer Michael Jordan', year: 1986, value: '$738,000 (PSA 10)', image: 'https://www.psacard.com/cert/76799843/michaeljordan', description: 'The king of basketball cards' },
+      { name: '2000 Playoff Contenders Tom Brady', year: 2000, value: '$3,100,000', image: 'https://www.psacard.com/cert/52885817', description: 'Most valuable football card' },
+    ],
+    facts: [
+      'The sports card industry is worth over $5.4 billion annually',
+      'PSA has graded over 50 million cards',
+      'Rookie cards typically command the highest premiums',
+      'Game-used memorabilia cards were introduced in 1996',
+    ],
+  },
+  lorcana: {
+    title: 'Disney Lorcana',
+    subtitle: 'Magic Meets Disney',
+    founded: '2023',
+    timeline: [
+      { year: 2022, event: 'Disney Lorcana announced at D23' },
+      { year: 2023, event: 'The First Chapter releases' },
+      { year: 2023, event: 'Rise of the Floodborn expansion' },
+      { year: 2024, event: 'Into the Inklands released' },
+      { year: 2024, event: 'Ursula\'s Return expansion' },
+      { year: 2024, event: 'Shimmering Skies released' },
+    ],
+    iconicCards: [
+      { name: 'Mickey Mouse - Brave Little Tailor (Enchanted)', year: 2023, value: '$500+', image: 'https://lorcana-api.com/images/cards/TFC/1.png', description: 'First Chapter chase card' },
+      { name: 'Elsa - Spirit of Winter (Enchanted)', year: 2023, value: '$800+', image: 'https://lorcana-api.com/images/cards/TFC/2.png', description: 'Most sought-after Enchanted' },
+      { name: 'Stitch - Rock Star (Enchanted)', year: 2023, value: '$300+', image: 'https://lorcana-api.com/images/cards/TFC/3.png', description: 'Popular character variant' },
+    ],
+    facts: [
+      'Lorcana sold over 1 billion cards in its first year',
+      'The game features 6 ink colors with unique playstyles',
+      'Enchanted cards are the highest rarity level',
+      'Players collect "Lore" to win instead of attacking opponents directly',
+    ],
+  },
+};
 
-  learningPaths: [
-    {
-      id: 'beginner-collecting',
-      title: 'Getting Started with Card Collecting',
-      description: 'Learn the basics of trading card collecting',
-      modules: [
-        { title: 'Types of Trading Cards', duration: '10 min' },
-        { title: 'Understanding Card Conditions', duration: '15 min' },
-        { title: 'Where to Buy Cards Safely', duration: '10 min' },
-        { title: 'Protecting Your Collection', duration: '10 min' },
-        { title: 'Your First Cards: What to Collect', duration: '15 min' },
-      ],
-    },
-    {
-      id: 'grading-101',
-      title: 'Card Grading Fundamentals',
-      description: 'Understand professional card grading',
-      modules: [
-        { title: 'Why Grade Cards?', duration: '10 min' },
-        { title: 'PSA vs BGS vs CGC vs SGC', duration: '20 min' },
-        { title: 'Understanding the Grading Scale', duration: '15 min' },
-        { title: 'How to Submit Cards', duration: '15 min' },
-        { title: 'Is Grading Worth It?', duration: '10 min' },
-      ],
-    },
-    {
-      id: 'investing-basics',
-      title: 'Card Investment Strategies',
-      description: 'Learn to invest wisely in trading cards',
-      modules: [
-        { title: 'Cards as Alternative Assets', duration: '15 min' },
-        { title: 'Identifying Valuable Cards', duration: '20 min' },
-        { title: 'Market Trends and Timing', duration: '15 min' },
-        { title: 'Risk Management', duration: '15 min' },
-        { title: 'Building a Portfolio', duration: '20 min' },
-      ],
-    },
+const GRADING_GUIDE = {
+  title: 'Card Grading 101',
+  companies: [
+    { name: 'PSA', fullName: 'Professional Sports Authenticator', founded: 1991, specialty: 'Sports & Pokemon', grades: '1-10 scale', topGrade: 'PSA 10 Gem Mint' },
+    { name: 'BGS', fullName: 'Beckett Grading Services', founded: 1999, specialty: 'All TCGs', grades: '1-10 with subgrades', topGrade: 'BGS 10 Pristine/Black Label' },
+    { name: 'CGC', fullName: 'Certified Guaranty Company', founded: 2020, specialty: 'Trading Cards', grades: '1-10 with subgrades', topGrade: 'CGC 10 Perfect' },
+    { name: 'SGC', fullName: 'Sportscard Guaranty', founded: 1998, specialty: 'Vintage Sports', grades: '1-10 scale', topGrade: 'SGC 10 Gem Mint' },
+  ],
+  factors: [
+    { name: 'Centering', description: 'How well the image is centered within the borders', impact: 'High' },
+    { name: 'Corners', description: 'Sharpness and condition of all four corners', impact: 'High' },
+    { name: 'Edges', description: 'Smoothness and condition of card edges', impact: 'Medium' },
+    { name: 'Surface', description: 'Scratches, print defects, or damage on card face', impact: 'High' },
+  ],
+  tips: [
+    'Always use penny sleeves and top loaders for storage',
+    'Never touch the surface of a card with bare fingers',
+    'Store cards in a cool, dry environment',
+    'Consider the cost vs value before grading',
+    'Research population reports before submitting',
   ],
 };
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+  const category = searchParams.get('category')?.toLowerCase();
   const section = searchParams.get('section');
-  const category = searchParams.get('category');
 
-  if (section === 'timeline') {
+  // Return specific exhibit
+  if (category && MUSEUM_EXHIBITS[category as keyof typeof MUSEUM_EXHIBITS]) {
     return NextResponse.json({
       success: true,
-      data: MUSEUM_EXHIBITS.timeline,
-      total: MUSEUM_EXHIBITS.timeline.length,
+      exhibit: MUSEUM_EXHIBITS[category as keyof typeof MUSEUM_EXHIBITS],
     });
   }
 
-  if (section === 'hall-of-fame') {
+  // Return grading guide
+  if (section === 'grading') {
     return NextResponse.json({
       success: true,
-      data: MUSEUM_EXHIBITS.hallOfFame,
-      total: MUSEUM_EXHIBITS.hallOfFame.length,
+      grading: GRADING_GUIDE,
     });
   }
 
-  if (section === 'categories' && category) {
-    const catData = MUSEUM_EXHIBITS.categories[category as keyof typeof MUSEUM_EXHIBITS.categories];
-    if (catData) {
-      return NextResponse.json({ success: true, data: catData });
-    }
-    return NextResponse.json({ success: false, error: 'Category not found' }, { status: 404 });
-  }
-
-  if (section === 'learning') {
-    return NextResponse.json({
-      success: true,
-      data: MUSEUM_EXHIBITS.learningPaths,
-    });
-  }
-
-  // Return full museum data
+  // Return all exhibits overview
   return NextResponse.json({
     success: true,
-    data: MUSEUM_EXHIBITS,
-    sections: ['timeline', 'hall-of-fame', 'categories', 'learning'],
-    description: 'CravCards Museum - Complete Trading Card History',
+    exhibits: Object.entries(MUSEUM_EXHIBITS).map(([key, exhibit]) => ({
+      id: key,
+      title: exhibit.title,
+      subtitle: exhibit.subtitle,
+      founded: exhibit.founded,
+      cardCount: exhibit.iconicCards.length,
+      timelineEvents: exhibit.timeline.length,
+    })),
+    gradingGuide: GRADING_GUIDE,
+    totalExhibits: Object.keys(MUSEUM_EXHIBITS).length,
   });
 }
