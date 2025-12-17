@@ -1,255 +1,234 @@
 // ============================================================================
-// CARD GAMES & ACTIVITIES API
-// Interactive games for card collectors
+// CARD GAMES API - Multiple Game Types
+// Trivia, Matching, Price Guessing, Flashcards, Collection Challenge
 // CravCards - CR AudioViz AI, LLC
 // Created: December 16, 2025
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 
-// ==================== GAME: PRICE IS RIGHT ====================
-interface PriceGuessGame {
-  type: 'price_guess';
-  card: {
-    name: string;
-    category: string;
-    image: string;
-    condition: string;
-    graded?: string;
-    hints: string[];
-  };
-  actualPrice: number;
-  difficulty: string;
-  xpReward: number;
-}
-
-const PRICE_GUESS_CARDS: PriceGuessGame[] = [
-  {
-    type: 'price_guess',
-    card: { name: 'Charizard Base Set Holo', category: 'pokemon', image: 'https://images.pokemontcg.io/base1/4.png', condition: 'PSA 9', hints: ['Most iconic Pokemon card', '1999 release', 'Fire type'] },
-    actualPrice: 2500,
-    difficulty: 'medium',
-    xpReward: 25,
-  },
-  {
-    type: 'price_guess',
-    card: { name: 'Black Lotus (Beta)', category: 'mtg', image: 'https://cards.scryfall.io/normal/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg', condition: 'BGS 8.5', hints: ['Most powerful MTG card', 'Provides 3 mana', 'Reserved List'] },
-    actualPrice: 75000,
-    difficulty: 'hard',
-    xpReward: 50,
-  },
-  {
-    type: 'price_guess',
-    card: { name: 'Blue-Eyes White Dragon (LOB-001)', category: 'yugioh', image: 'https://images.ygoprodeck.com/images/cards/89631139.jpg', condition: 'PSA 10', hints: ['Kaiba\'s signature card', '3000 ATK', 'First set'] },
-    actualPrice: 5000,
-    difficulty: 'medium',
-    xpReward: 25,
-  },
-  {
-    type: 'price_guess',
-    card: { name: '1986 Fleer Michael Jordan Rookie', category: 'sports', image: 'https://thesportsdb.com/images/media/player/thumb/h9y6s31547838080.jpg', condition: 'PSA 10', hints: ['The GOAT\'s rookie card', 'Red jersey #23', 'Fleer\'s first basketball set'] },
-    actualPrice: 738000,
-    difficulty: 'hard',
-    xpReward: 50,
-  },
-  {
-    type: 'price_guess',
-    card: { name: 'Pikachu Base Set 1st Edition', category: 'pokemon', image: 'https://images.pokemontcg.io/base1/58.png', condition: 'PSA 10', hints: ['Most popular Pokemon', 'Yellow mouse', 'Electric type'] },
-    actualPrice: 5500,
-    difficulty: 'medium',
-    xpReward: 25,
-  },
+// Price Guessing Game Data
+const PRICE_GUESS_CARDS = [
+  { id: 'pg-1', name: '1952 Topps Mickey Mantle PSA 9', image: '/cards/mantle-52.jpg', actual_price: 4200000, category: 'sports', hint: 'Most valuable post-war baseball card' },
+  { id: 'pg-2', name: 'PSA 10 Base Set Charizard 1st Ed', image: '/cards/charizard-base.jpg', actual_price: 420000, category: 'pokemon', hint: 'The most iconic Pokemon card' },
+  { id: 'pg-3', name: 'Alpha Black Lotus BGS 9.5', image: '/cards/black-lotus.jpg', actual_price: 350000, category: 'mtg', hint: 'The most powerful Magic card ever printed' },
+  { id: 'pg-4', name: '1986 Fleer Michael Jordan RC PSA 10', image: '/cards/jordan-86.jpg', actual_price: 738000, category: 'sports', hint: 'The GOAT basketball player\'s rookie' },
+  { id: 'pg-5', name: 'Pikachu Illustrator PSA 9', image: '/cards/pikachu-illustrator.jpg', actual_price: 2000000, category: 'pokemon', hint: 'Only 39 ever made' },
+  { id: 'pg-6', name: '1909 T206 Honus Wagner PSA 5', image: '/cards/wagner.jpg', actual_price: 3700000, category: 'sports', hint: 'The "Holy Grail" of baseball cards' },
+  { id: 'pg-7', name: 'Blue-Eyes White Dragon 1st Ed LOB PSA 10', image: '/cards/blue-eyes.jpg', actual_price: 85000, category: 'yugioh', hint: 'Kaiba\'s signature card' },
+  { id: 'pg-8', name: 'Alpha Ancestral Recall PSA 10', image: '/cards/ancestral-recall.jpg', actual_price: 150000, category: 'mtg', hint: 'Part of the Power Nine' },
+  { id: 'pg-9', name: '2009 Bowman Chrome Mike Trout Auto', image: '/cards/trout-auto.jpg', actual_price: 3900000, category: 'sports', hint: 'The defining modern baseball card' },
+  { id: 'pg-10', name: 'Shining Charizard 1st Ed PSA 10', image: '/cards/shining-charizard.jpg', actual_price: 50000, category: 'pokemon', hint: 'From Neo Destiny set' },
 ];
 
-// ==================== GAME: CARD MATCH ====================
-interface CardMatchGame {
-  type: 'card_match';
-  cards: Array<{
-    id: string;
-    name: string;
-    image: string;
-  }>;
-  pairs: number;
-  timeLimit: number;
-  xpReward: number;
-}
+// Matching Game Pairs
+const MATCHING_PAIRS = {
+  pokemon: [
+    { id: 1, pairs: [{ text: 'Pikachu', match: 'Electric Type' }, { text: 'Charizard', match: 'Fire/Flying Type' }, { text: 'Bulbasaur', match: 'Grass/Poison Type' }, { text: 'Squirtle', match: 'Water Type' }, { text: 'Mewtwo', match: 'Psychic Type' }, { text: 'Gengar', match: 'Ghost/Poison Type' }] },
+    { id: 2, pairs: [{ text: 'Base Set', match: '1999' }, { text: 'Neo Genesis', match: '2000' }, { text: 'EX Ruby & Sapphire', match: '2003' }, { text: 'Diamond & Pearl', match: '2007' }, { text: 'Scarlet & Violet', match: '2023' }, { text: 'Jungle', match: '1999' }] },
+  ],
+  mtg: [
+    { id: 1, pairs: [{ text: 'Black Lotus', match: 'Power Nine' }, { text: 'Lightning Bolt', match: '3 Damage for 1 Mana' }, { text: 'Counterspell', match: 'Counter target spell' }, { text: 'Wrath of God', match: 'Destroy all creatures' }, { text: 'Sol Ring', match: 'Add 2 colorless mana' }, { text: 'Force of Will', match: 'Free counterspell' }] },
+    { id: 2, pairs: [{ text: 'White', match: 'Plains' }, { text: 'Blue', match: 'Island' }, { text: 'Black', match: 'Swamp' }, { text: 'Red', match: 'Mountain' }, { text: 'Green', match: 'Forest' }, { text: 'Colorless', match: 'Wastes' }] },
+  ],
+  grading: [
+    { id: 1, pairs: [{ text: 'PSA 10', match: 'Gem Mint' }, { text: 'PSA 9', match: 'Mint' }, { text: 'PSA 8', match: 'NM-MT' }, { text: 'BGS 9.5', match: 'Gem Mint (Beckett)' }, { text: 'BGS Black Label', match: 'All 10 Subgrades' }, { text: 'SGC 10', match: 'Pristine (SGC)' }] },
+  ],
+};
 
-// ==================== GAME: GUESS THE CARD ====================
-interface GuessCardGame {
-  type: 'guess_card';
-  category: string;
-  hints: string[];
-  answer: string;
-  image: string;
-  options: string[];
-  xpReward: number;
-}
+// Flashcard Decks
+const FLASHCARD_DECKS = {
+  grading: [
+    { front: 'What does PSA stand for?', back: 'Professional Sports Authenticator' },
+    { front: 'What is the highest PSA grade?', back: '10 (Gem Mint)' },
+    { front: 'What are the 4 BGS subgrades?', back: 'Centering, Corners, Edges, Surface' },
+    { front: 'What is a "slab"?', back: 'A graded card in its protective holder' },
+    { front: 'What is a BGS Black Label?', back: 'A card with all 10 subgrades' },
+    { front: 'What does CGC stand for?', back: 'Certified Guaranty Company' },
+    { front: 'What percentage of cards get PSA 10?', back: 'About 2-5%' },
+    { front: 'What company uses "tuxedo" labels?', back: 'SGC' },
+  ],
+  pokemon: [
+    { front: 'What year was English Base Set released?', back: '1999' },
+    { front: 'What is the rarest Pokemon card?', back: 'Pikachu Illustrator' },
+    { front: 'What does "shadowless" mean?', back: 'No shadow on the artwork box (Base Set)' },
+    { front: 'Who illustrated Base Set Charizard?', back: 'Mitsuhiro Arita' },
+    { front: 'How many 1st Ed Base Set Charizards exist in PSA 10?', back: 'Around 120' },
+    { front: 'What was the last WOTC set?', back: 'Skyridge' },
+  ],
+  mtg: [
+    { front: 'What year was MTG created?', back: '1993' },
+    { front: 'Who created Magic: The Gathering?', back: 'Richard Garfield' },
+    { front: 'Name 3 cards from the Power Nine', back: 'Black Lotus, Mox Sapphire, Time Walk, Ancestral Recall, Timetwister' },
+    { front: 'What is the Reserved List?', back: 'Cards Wizards promised never to reprint' },
+    { front: 'What was the first MTG expansion?', back: 'Arabian Nights (1993)' },
+  ],
+  sports: [
+    { front: 'What is the most valuable sports card?', back: '1952 Topps Mickey Mantle (sold for $12.6M)' },
+    { front: 'What year is Jordan\'s Fleer rookie from?', back: '1986-87' },
+    { front: 'What does RC mean?', back: 'Rookie Card' },
+    { front: 'What was the "Junk Wax Era"?', back: '1987-1994, era of massive overproduction' },
+    { front: 'What company is taking over from Topps for MLB?', back: 'Fanatics' },
+  ],
+};
 
-const GUESS_CARD_GAMES: GuessCardGame[] = [
-  {
-    type: 'guess_card',
-    category: 'pokemon',
-    hints: ['Fire/Flying type', 'Evolves from Charmeleon', '006 in the Pokedex', 'Has Mega evolutions'],
-    answer: 'Charizard',
-    image: 'https://images.pokemontcg.io/base1/4.png',
-    options: ['Charizard', 'Dragonite', 'Typhlosion', 'Blaziken'],
-    xpReward: 15,
-  },
-  {
-    type: 'guess_card',
-    category: 'mtg',
-    hints: ['0 mana artifact', 'Provides 3 mana of any color', 'On the Reserved List', 'Named after a flower'],
-    answer: 'Black Lotus',
-    image: 'https://cards.scryfall.io/normal/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg',
-    options: ['Black Lotus', 'Mox Diamond', 'Sol Ring', 'Mana Crypt'],
-    xpReward: 20,
-  },
-  {
-    type: 'guess_card',
-    category: 'yugioh',
-    hints: ['Level 7 DARK Spellcaster', '2500 ATK / 2100 DEF', 'Yugi\'s signature monster', 'The ultimate wizard'],
-    answer: 'Dark Magician',
-    image: 'https://images.ygoprodeck.com/images/cards/46986414.jpg',
-    options: ['Dark Magician', 'Dark Magician Girl', 'Magician of Black Chaos', 'Sorcerer of Dark Magic'],
-    xpReward: 15,
-  },
-  {
-    type: 'guess_card',
-    category: 'sports',
-    hints: ['Hit king with 4,256 hits', 'Played for the Reds', 'Nicknamed "Charlie Hustle"', 'Banned from baseball'],
-    answer: 'Pete Rose',
-    image: 'https://www.thesportsdb.com/images/media/player/thumb/wlzhm01747758742.jpg',
-    options: ['Pete Rose', 'Ty Cobb', 'Hank Aaron', 'Derek Jeter'],
-    xpReward: 20,
-  },
+// Daily Challenges
+const DAILY_CHALLENGES = [
+  { type: 'trivia', title: 'Daily Quiz', description: 'Answer 10 questions correctly', xp_reward: 100, goal: 10 },
+  { type: 'price_guess', title: 'Price Master', description: 'Guess within 20% of actual price 5 times', xp_reward: 150, goal: 5 },
+  { type: 'matching', title: 'Match Maker', description: 'Complete 3 matching games', xp_reward: 75, goal: 3 },
+  { type: 'flashcards', title: 'Study Session', description: 'Review 20 flashcards', xp_reward: 50, goal: 20 },
+  { type: 'collection', title: 'Card Hunter', description: 'Add 5 cards to your collection', xp_reward: 100, goal: 5 },
 ];
 
-// ==================== GAME: COLLECTION BUILDER ====================
-interface CollectionChallenge {
-  type: 'collection_challenge';
-  name: string;
-  description: string;
-  requirements: Array<{
-    category: string;
-    count: number;
-    rarity?: string;
-  }>;
-  rewards: {
-    xp: number;
-    badge?: string;
-    title?: string;
-  };
-}
-
-const COLLECTION_CHALLENGES: CollectionChallenge[] = [
-  {
-    type: 'collection_challenge',
-    name: 'Starter Collector',
-    description: 'Add your first 10 cards to your collection',
-    requirements: [{ category: 'any', count: 10 }],
-    rewards: { xp: 100, badge: 'starter_collector' },
-  },
-  {
-    type: 'collection_challenge',
-    name: 'Pokemon Master',
-    description: 'Collect 50 Pokemon cards',
-    requirements: [{ category: 'pokemon', count: 50 }],
-    rewards: { xp: 500, badge: 'pokemon_master', title: 'Pokemon Master' },
-  },
-  {
-    type: 'collection_challenge',
-    name: 'Planeswalker',
-    description: 'Collect 25 Magic: The Gathering cards',
-    requirements: [{ category: 'mtg', count: 25 }],
-    rewards: { xp: 300, badge: 'planeswalker' },
-  },
-  {
-    type: 'collection_challenge',
-    name: 'Duelist',
-    description: 'Collect 25 Yu-Gi-Oh! cards',
-    requirements: [{ category: 'yugioh', count: 25 }],
-    rewards: { xp: 300, badge: 'duelist' },
-  },
-  {
-    type: 'collection_challenge',
-    name: 'Sports Fanatic',
-    description: 'Collect 30 sports cards',
-    requirements: [{ category: 'sports', count: 30 }],
-    rewards: { xp: 350, badge: 'sports_fanatic' },
-  },
-  {
-    type: 'collection_challenge',
-    name: 'Grade Hunter',
-    description: 'Add 5 graded cards (PSA/BGS/CGC) to your collection',
-    requirements: [{ category: 'any', count: 5, rarity: 'graded' }],
-    rewards: { xp: 400, badge: 'grade_hunter', title: 'Grade Hunter' },
-  },
+// Achievements
+const GAME_ACHIEVEMENTS = [
+  { id: 'trivia-novice', name: 'Trivia Novice', description: 'Answer 10 questions correctly', icon: '🎯', xp: 50 },
+  { id: 'trivia-expert', name: 'Trivia Expert', description: 'Answer 100 questions correctly', icon: '🧠', xp: 200 },
+  { id: 'trivia-master', name: 'Trivia Master', description: 'Answer 500 questions correctly', icon: '👑', xp: 500 },
+  { id: 'price-eye', name: 'Appraiser', description: 'Guess 10 prices within 20%', icon: '💰', xp: 100 },
+  { id: 'match-fast', name: 'Quick Matcher', description: 'Complete a match game in under 30 seconds', icon: '⚡', xp: 75 },
+  { id: 'streak-7', name: 'Week Warrior', description: 'Play games 7 days in a row', icon: '🔥', xp: 150 },
+  { id: 'all-categories', name: 'Well Rounded', description: 'Play trivia in all categories', icon: '🌈', xp: 100 },
+  { id: 'perfect-game', name: 'Perfect Score', description: 'Get 100% on any trivia round', icon: '✨', xp: 200 },
 ];
-
-// ==================== GAME: DAILY CHALLENGE ====================
-function getDailyChallenge(): object {
-  const today = new Date().toDateString();
-  const seed = today.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-  const index = seed % GUESS_CARD_GAMES.length;
-  
-  return {
-    type: 'daily_challenge',
-    date: today,
-    game: GUESS_CARD_GAMES[index],
-    bonusXp: 50,
-    streak: true,
-  };
-}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const gameType = searchParams.get('type');
-  const category = searchParams.get('category');
+  const game = searchParams.get('game');
+  const category = searchParams.get('category') || 'all';
+  const count = Math.min(parseInt(searchParams.get('count') || '5'), 20);
 
-  // Daily challenge
-  if (gameType === 'daily') {
+  // Price Guessing Game
+  if (game === 'price-guess') {
+    let cards = [...PRICE_GUESS_CARDS];
+    if (category !== 'all') {
+      cards = cards.filter(c => c.category === category);
+    }
+    const shuffled = cards.sort(() => Math.random() - 0.5).slice(0, count);
     return NextResponse.json({
       success: true,
-      game: getDailyChallenge(),
+      game: 'price-guess',
+      data: shuffled.map(c => ({
+        id: c.id,
+        name: c.name,
+        image: c.image,
+        category: c.category,
+        hint: c.hint,
+        // Don't send actual price - client submits guess, server validates
+      })),
     });
   }
 
-  // Price guessing game
-  if (gameType === 'price_guess') {
-    const games = category 
-      ? PRICE_GUESS_CARDS.filter(g => g.card.category === category)
-      : PRICE_GUESS_CARDS;
-    const random = games[Math.floor(Math.random() * games.length)];
-    return NextResponse.json({ success: true, game: random });
-  }
+  // Matching Game
+  if (game === 'matching') {
+    const matchData = category !== 'all' 
+      ? MATCHING_PAIRS[category as keyof typeof MATCHING_PAIRS] 
+      : Object.values(MATCHING_PAIRS).flat();
+    
+    if (!matchData || matchData.length === 0) {
+      return NextResponse.json({ success: false, error: 'Invalid category' }, { status: 400 });
+    }
 
-  // Guess the card game
-  if (gameType === 'guess_card') {
-    const games = category
-      ? GUESS_CARD_GAMES.filter(g => g.category === category)
-      : GUESS_CARD_GAMES;
-    const random = games[Math.floor(Math.random() * games.length)];
-    return NextResponse.json({ success: true, game: random });
-  }
-
-  // Collection challenges
-  if (gameType === 'challenges') {
+    const randomSet = matchData[Math.floor(Math.random() * matchData.length)];
     return NextResponse.json({
       success: true,
-      challenges: COLLECTION_CHALLENGES,
+      game: 'matching',
+      data: {
+        pairs: randomSet.pairs.sort(() => Math.random() - 0.5),
+        timeLimit: 60,
+      },
     });
   }
 
-  // Return all game types
+  // Flashcards
+  if (game === 'flashcards') {
+    const deck = category !== 'all' 
+      ? FLASHCARD_DECKS[category as keyof typeof FLASHCARD_DECKS]
+      : Object.values(FLASHCARD_DECKS).flat();
+
+    if (!deck) {
+      return NextResponse.json({ success: false, error: 'Invalid category' }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      game: 'flashcards',
+      data: deck.sort(() => Math.random() - 0.5).slice(0, count),
+      total: deck.length,
+    });
+  }
+
+  // Daily Challenges
+  if (game === 'daily') {
+    const today = new Date().toISOString().split('T')[0];
+    return NextResponse.json({
+      success: true,
+      game: 'daily',
+      date: today,
+      challenges: DAILY_CHALLENGES,
+    });
+  }
+
+  // Achievements
+  if (game === 'achievements') {
+    return NextResponse.json({
+      success: true,
+      game: 'achievements',
+      data: GAME_ACHIEVEMENTS,
+    });
+  }
+
+  // Return all available games
   return NextResponse.json({
     success: true,
-    gameTypes: [
-      { id: 'price_guess', name: 'Price is Right', description: 'Guess the value of rare cards' },
-      { id: 'guess_card', name: 'Guess the Card', description: 'Identify cards from hints' },
-      { id: 'daily', name: 'Daily Challenge', description: 'New challenge every day' },
-      { id: 'challenges', name: 'Collection Challenges', description: 'Complete collecting goals' },
+    games: [
+      { id: 'trivia', name: 'Trivia', description: 'Test your card knowledge', endpoint: '/api/trivia' },
+      { id: 'price-guess', name: 'Price Guess', description: 'Guess the value of famous cards', endpoint: '/api/games?game=price-guess' },
+      { id: 'matching', name: 'Card Match', description: 'Match cards with their attributes', endpoint: '/api/games?game=matching' },
+      { id: 'flashcards', name: 'Flashcards', description: 'Study and learn card facts', endpoint: '/api/games?game=flashcards' },
+      { id: 'daily', name: 'Daily Challenges', description: 'Complete daily tasks for XP', endpoint: '/api/games?game=daily' },
     ],
-    categories: ['pokemon', 'mtg', 'yugioh', 'sports'],
-    dailyChallenge: getDailyChallenge(),
+    categories: ['all', 'pokemon', 'mtg', 'yugioh', 'sports', 'grading'],
+    achievements: GAME_ACHIEVEMENTS.length,
   });
+}
+
+// POST endpoint for validating guesses
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  const { game, cardId, guess } = body;
+
+  if (game === 'price-guess') {
+    const card = PRICE_GUESS_CARDS.find(c => c.id === cardId);
+    if (!card) {
+      return NextResponse.json({ success: false, error: 'Card not found' }, { status: 404 });
+    }
+
+    const percentOff = Math.abs((guess - card.actual_price) / card.actual_price * 100);
+    const isCorrect = percentOff <= 20;
+    
+    let xp = 0;
+    if (percentOff <= 5) xp = 50;
+    else if (percentOff <= 10) xp = 30;
+    else if (percentOff <= 20) xp = 20;
+    else if (percentOff <= 50) xp = 5;
+
+    return NextResponse.json({
+      success: true,
+      result: {
+        guess,
+        actual_price: card.actual_price,
+        percent_off: Math.round(percentOff),
+        is_correct: isCorrect,
+        xp_earned: xp,
+        feedback: percentOff <= 5 ? 'Amazing! Expert appraiser!' :
+                  percentOff <= 10 ? 'Great guess!' :
+                  percentOff <= 20 ? 'Close enough!' :
+                  percentOff <= 50 ? 'Getting there...' : 'Way off!',
+      },
+    });
+  }
+
+  return NextResponse.json({ success: false, error: 'Invalid game type' }, { status: 400 });
 }
