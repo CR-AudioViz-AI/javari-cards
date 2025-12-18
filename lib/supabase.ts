@@ -6,9 +6,6 @@
 
 import { createClient as supabaseCreateClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Re-export createClient for components that need it directly
-export const createClient = supabaseCreateClient;
-
 // Centralized Supabase configuration
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://kteobfyferrukqeolofj.supabase.co';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxOTcyNjYsImV4cCI6MjA3NzU1NzI2Nn0.uy-jlF_z6qVb8qogsNyGDLHqT4HhmdRhLrW7zPv3qhY';
@@ -19,13 +16,18 @@ export const supabase: SupabaseClient = supabaseCreateClient(SUPABASE_URL, SUPAB
 // Browser client for auth (SSR-safe singleton pattern)
 let browserClient: SupabaseClient | null = null;
 
-export function createSupabaseBrowserClient(): SupabaseClient {
+/**
+ * createClient - Zero-argument wrapper for Supabase client
+ * Used by pages that import { createClient } from '@/lib/supabase'
+ * Automatically uses centralized URL and key configuration
+ */
+export function createClient(): SupabaseClient {
   if (typeof window === 'undefined') {
     // Server-side: return new client each time
     return supabaseCreateClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
   
-  // Client-side: return singleton
+  // Client-side: return singleton for performance
   if (!browserClient) {
     browserClient = supabaseCreateClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
@@ -38,7 +40,12 @@ export function createSupabaseBrowserClient(): SupabaseClient {
   return browserClient;
 }
 
-// Server client for API routes
+// Alias for explicit browser client usage
+export function createSupabaseBrowserClient(): SupabaseClient {
+  return createClient();
+}
+
+// Server client for API routes (uses service role key for elevated permissions)
 export function createSupabaseServerClient(): SupabaseClient {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) {
