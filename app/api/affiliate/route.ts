@@ -1,6 +1,6 @@
 // ============================================================================
 // AFFILIATE INTEGRATION API
-// TCGPlayer, eBay, Amazon buy links with affiliate tracking
+// TCGPlayer, eBay, and other marketplace buy links with commission tracking
 // CravCards - CR AudioViz AI, LLC
 // Created: December 17, 2025
 // ============================================================================
@@ -13,90 +13,83 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Affiliate configuration (would be env vars in production)
-const AFFILIATE_CONFIG = {
-  tcgplayer: {
-    partner_code: process.env.TCGPLAYER_AFFILIATE_CODE || 'CRAVCARDS',
-    base_url: 'https://www.tcgplayer.com',
-    commission_rate: 0.05,
-  },
-  ebay: {
-    campaign_id: process.env.EBAY_CAMPAIGN_ID || '5338000000',
-    base_url: 'https://www.ebay.com',
-    commission_rate: 0.04,
-  },
-  amazon: {
-    tag: process.env.AMAZON_AFFILIATE_TAG || 'cravcards-20',
-    base_url: 'https://www.amazon.com',
-    commission_rate: 0.03,
-  },
-  cardmarket: {
-    partner_id: process.env.CARDMARKET_PARTNER_ID || 'cravcards',
-    base_url: 'https://www.cardmarket.com',
-    commission_rate: 0.04,
-  },
-};
-
 interface AffiliateLink {
-  platform: string;
+  marketplace: string;
   url: string;
   price: number | null;
-  shipping: string;
-  seller_rating: number | null;
-  in_stock: boolean;
   condition: string;
+  seller_rating: number | null;
+  shipping: string;
+  in_stock: boolean;
+  affiliate_id: string;
+}
+
+interface MarketplaceListing {
+  marketplace: string;
+  title: string;
+  price: number;
+  shipping_cost: number;
+  condition: string;
+  seller: string;
+  seller_rating: number;
+  url: string;
+  image_url: string | null;
   quantity_available: number;
 }
 
-interface BuyOption {
-  card_id: string;
-  card_name: string;
-  category: string;
-  links: AffiliateLink[];
-  best_price: {
-    platform: string;
-    price: number;
-    url: string;
-  } | null;
-  price_comparison: {
-    lowest: number;
-    highest: number;
-    average: number;
-  };
+interface AffiliateConfig {
+  tcgplayer: { affiliate_id: string; enabled: boolean };
+  ebay: { campaign_id: string; enabled: boolean };
+  amazon: { tag: string; enabled: boolean };
+  cardmarket: { affiliate_id: string; enabled: boolean };
 }
 
-// GET - Get buy links for a card
+// Affiliate configuration
+const AFFILIATE_CONFIG: AffiliateConfig = {
+  tcgplayer: {
+    affiliate_id: process.env.TCGPLAYER_AFFILIATE_ID || 'cravcards',
+    enabled: true,
+  },
+  ebay: {
+    campaign_id: process.env.EBAY_CAMPAIGN_ID || '5338000000',
+    enabled: true,
+  },
+  amazon: {
+    tag: process.env.AMAZON_AFFILIATE_TAG || 'cravcards-20',
+    enabled: true,
+  },
+  cardmarket: {
+    affiliate_id: process.env.CARDMARKET_AFFILIATE_ID || 'cravcards',
+    enabled: false, // EU only
+  },
+};
+
+// GET - Get affiliate links or listings
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const cardId = searchParams.get('card_id');
   const cardName = searchParams.get('name');
   const category = searchParams.get('category');
-  const condition = searchParams.get('condition') || 'nm';
   const action = searchParams.get('action') || 'links';
-  const userId = searchParams.get('user_id');
+  const marketplace = searchParams.get('marketplace');
+
+  if (!cardId && !cardName) {
+    return NextResponse.json({
+      success: false,
+      error: 'Card ID or name required',
+    }, { status: 400 });
+  }
 
   try {
     switch (action) {
       case 'links':
-        if (!cardId && !cardName) {
-          return NextResponse.json({ success: false, error: 'Card ID or name required' }, { status: 400 });
-        }
-        return await getBuyLinks(cardId, cardName, category, condition, userId);
-      
-      case 'track':
-        const linkId = searchParams.get('link_id');
-        const platform = searchParams.get('platform');
-        return await trackClick(linkId, platform, userId);
-      
-      case 'earnings':
-        if (!userId) {
-          return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
-        }
-        return await getEarnings(userId);
-      
-      case 'stats':
-        return await getAffiliateStats(userId);
-      
+        return await getAffiliateLinks(cardId, cardName, category);
+      case 'listings':
+        return await getMarketplaceListings(cardId, cardName, category, marketplace);
+      case 'best-price':
+        return await getBestPrice(cardId, cardName, category);
+      case 'track-click':
+        return await trackClick(searchParams.get('user_id'), cardId, marketplace);
       default:
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
@@ -106,19 +99,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Register affiliate click or conversion
+// POST - Track conversions or manage affiliate settings
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, user_id } = body;
+    const { action } = body;
 
     switch (action) {
-      case 'click':
-        return await registerClick(body);
-      case 'conversion':
-        return await registerConversion(body);
-      case 'apply':
-        return await applyForAffiliate(user_id, body);
+      case 'track-conversion':
+        return await trackConversion(body);
+      case 'webhook':
+        return await handleAffiliateWebhook(body);
       default:
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
@@ -128,389 +119,297 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Get buy links for a card
-async function getBuyLinks(
+// Get affiliate links for all marketplaces
+async function getAffiliateLinks(
   cardId: string | null,
   cardName: string | null,
-  category: string | null,
-  condition: string,
-  userId: string | null
+  category: string | null
 ): Promise<NextResponse> {
-  const name = cardName || 'Unknown Card';
-  const cat = category || 'pokemon';
-
-  // Generate affiliate links
+  const name = cardName || await getCardName(cardId);
+  const searchQuery = encodeURIComponent(name || '');
+  
   const links: AffiliateLink[] = [];
 
   // TCGPlayer
-  const tcgSearchUrl = buildTCGPlayerUrl(name, cat);
-  const tcgPrice = generateRealisticPrice(cat, condition);
-  links.push({
-    platform: 'TCGPlayer',
-    url: tcgSearchUrl,
-    price: tcgPrice,
-    shipping: 'Free shipping over $35',
-    seller_rating: 4.8 + Math.random() * 0.2,
-    in_stock: Math.random() > 0.1,
-    condition: mapConditionDisplay(condition),
-    quantity_available: Math.floor(Math.random() * 20) + 1,
-  });
+  if (AFFILIATE_CONFIG.tcgplayer.enabled) {
+    const tcgCategory = mapCategoryToTCGPlayer(category);
+    links.push({
+      marketplace: 'TCGPlayer',
+      url: `https://www.tcgplayer.com/search/all/product?q=${searchQuery}&partner=${AFFILIATE_CONFIG.tcgplayer.affiliate_id}&utm_campaign=affiliate&utm_medium=cravcards&utm_source=cravcards${tcgCategory ? `&productLineName=${tcgCategory}` : ''}`,
+      price: await getTCGPlayerPrice(name, category),
+      condition: 'Various',
+      seller_rating: null,
+      shipping: 'Varies',
+      in_stock: true,
+      affiliate_id: AFFILIATE_CONFIG.tcgplayer.affiliate_id,
+    });
+  }
 
   // eBay
-  const ebayUrl = buildEbayUrl(name, cat);
-  const ebayPrice = tcgPrice * (0.9 + Math.random() * 0.2);
-  links.push({
-    platform: 'eBay',
-    url: ebayUrl,
-    price: Math.round(ebayPrice * 100) / 100,
-    shipping: 'Varies by seller',
-    seller_rating: 4.5 + Math.random() * 0.5,
-    in_stock: Math.random() > 0.05,
-    condition: mapConditionDisplay(condition),
-    quantity_available: Math.floor(Math.random() * 10) + 1,
-  });
-
-  // Amazon (for supplies and sealed product)
-  if (['supplies', 'sealed'].includes(cat) || Math.random() > 0.5) {
-    const amazonUrl = buildAmazonUrl(name, cat);
+  if (AFFILIATE_CONFIG.ebay.enabled) {
     links.push({
-      platform: 'Amazon',
-      url: amazonUrl,
-      price: tcgPrice * 1.1,
-      shipping: 'Prime eligible',
-      seller_rating: 4.3 + Math.random() * 0.7,
-      in_stock: Math.random() > 0.2,
+      marketplace: 'eBay',
+      url: `https://www.ebay.com/sch/i.html?_nkw=${searchQuery}&mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=${AFFILIATE_CONFIG.ebay.campaign_id}&toolid=10001&mkevt=1`,
+      price: null,
+      condition: 'Various',
+      seller_rating: null,
+      shipping: 'Varies',
+      in_stock: true,
+      affiliate_id: AFFILIATE_CONFIG.ebay.campaign_id,
+    });
+  }
+
+  // Amazon (for accessories, supplies, sealed products)
+  if (AFFILIATE_CONFIG.amazon.enabled) {
+    links.push({
+      marketplace: 'Amazon',
+      url: `https://www.amazon.com/s?k=${searchQuery}&tag=${AFFILIATE_CONFIG.amazon.tag}`,
+      price: null,
       condition: 'New',
-      quantity_available: Math.floor(Math.random() * 50) + 1,
+      seller_rating: null,
+      shipping: 'Prime eligible',
+      in_stock: true,
+      affiliate_id: AFFILIATE_CONFIG.amazon.tag,
     });
   }
 
-  // CardMarket (for MTG/Pokemon)
-  if (['pokemon', 'mtg', 'yugioh'].includes(cat)) {
-    const cmUrl = buildCardMarketUrl(name, cat);
-    const cmPrice = tcgPrice * (0.85 + Math.random() * 0.15); // Usually cheaper
+  // CardMarket (EU)
+  if (AFFILIATE_CONFIG.cardmarket.enabled) {
     links.push({
-      platform: 'CardMarket',
-      url: cmUrl,
-      price: Math.round(cmPrice * 100) / 100,
-      shipping: 'EU shipping, varies for US',
-      seller_rating: 4.6 + Math.random() * 0.4,
-      in_stock: Math.random() > 0.15,
-      condition: mapConditionDisplay(condition),
-      quantity_available: Math.floor(Math.random() * 30) + 1,
+      marketplace: 'CardMarket',
+      url: `https://www.cardmarket.com/en/Search?searchString=${searchQuery}&ref=${AFFILIATE_CONFIG.cardmarket.affiliate_id}`,
+      price: null,
+      condition: 'Various',
+      seller_rating: null,
+      shipping: 'EU shipping',
+      in_stock: true,
+      affiliate_id: AFFILIATE_CONFIG.cardmarket.affiliate_id,
     });
   }
-
-  // Sort by price
-  links.sort((a, b) => (a.price || 999) - (b.price || 999));
-
-  // Find best price
-  const inStockLinks = links.filter(l => l.in_stock && l.price);
-  const bestPrice = inStockLinks.length > 0 ? {
-    platform: inStockLinks[0].platform,
-    price: inStockLinks[0].price!,
-    url: inStockLinks[0].url,
-  } : null;
-
-  // Price comparison
-  const prices = links.filter(l => l.price).map(l => l.price!);
-  const priceComparison = prices.length > 0 ? {
-    lowest: Math.min(...prices),
-    highest: Math.max(...prices),
-    average: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length * 100) / 100,
-  } : { lowest: 0, highest: 0, average: 0 };
-
-  // Log search for analytics
-  if (userId) {
-    await logAffiliateSearch(userId, cardId || name, cat);
-  }
-
-  const buyOption: BuyOption = {
-    card_id: cardId || `search-${name.toLowerCase().replace(/\s+/g, '-')}`,
-    card_name: name,
-    category: cat,
-    links,
-    best_price: bestPrice,
-    price_comparison: priceComparison,
-  };
 
   return NextResponse.json({
     success: true,
-    buy_options: buyOption,
-    disclaimer: 'Prices may vary. CravCards earns a commission on purchases made through these links.',
+    card_name: name,
+    category,
+    links,
+    disclaimer: 'Prices shown are estimates. Click through for current pricing. CravCards earns a commission on purchases.',
   });
 }
 
-// Track affiliate click
-async function trackClick(linkId: string | null, platform: string | null, userId: string | null): Promise<NextResponse> {
-  const clickId = `click-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+// Get detailed marketplace listings
+async function getMarketplaceListings(
+  cardId: string | null,
+  cardName: string | null,
+  category: string | null,
+  marketplace: string | null
+): Promise<NextResponse> {
+  const name = cardName || await getCardName(cardId);
+  
+  // In production, this would call marketplace APIs
+  // For now, generate sample listings
+  const listings = generateSampleListings(name || 'Unknown Card', category, marketplace);
 
+  return NextResponse.json({
+    success: true,
+    card_name: name,
+    listings,
+    total: listings.length,
+    lowest_price: listings.length > 0 ? Math.min(...listings.map(l => l.price + l.shipping_cost)) : null,
+    generated: true, // Remove in production
+  });
+}
+
+// Get best price across all marketplaces
+async function getBestPrice(
+  cardId: string | null,
+  cardName: string | null,
+  category: string | null
+): Promise<NextResponse> {
+  const name = cardName || await getCardName(cardId);
+  const listings = generateSampleListings(name || 'Unknown Card', category, null);
+  
+  // Sort by total price
+  listings.sort((a, b) => (a.price + a.shipping_cost) - (b.price + b.shipping_cost));
+  
+  const best = listings[0];
+  const priceComparison = listings.slice(0, 5).map(l => ({
+    marketplace: l.marketplace,
+    price: l.price,
+    shipping: l.shipping_cost,
+    total: l.price + l.shipping_cost,
+    url: l.url,
+  }));
+
+  return NextResponse.json({
+    success: true,
+    card_name: name,
+    best_price: best ? {
+      marketplace: best.marketplace,
+      price: best.price,
+      shipping: best.shipping_cost,
+      total: best.price + best.shipping_cost,
+      url: best.url,
+      savings: listings.length > 1 
+        ? (listings[listings.length - 1].price + listings[listings.length - 1].shipping_cost) - (best.price + best.shipping_cost)
+        : 0,
+    } : null,
+    comparison: priceComparison,
+  });
+}
+
+// Track affiliate link click
+async function trackClick(
+  userId: string | null,
+  cardId: string | null,
+  marketplace: string | null
+): Promise<NextResponse> {
   await supabase.from('cv_affiliate_clicks').insert({
-    click_id: clickId,
-    link_id: linkId,
-    platform,
     user_id: userId,
+    card_id: cardId,
+    marketplace,
     clicked_at: new Date().toISOString(),
-    user_agent: 'unknown', // Would get from request headers
+    ip_hash: null, // Could hash IP for analytics
   });
 
   return NextResponse.json({
     success: true,
-    click_id: clickId,
     tracked: true,
   });
 }
 
-// Register affiliate click
-async function registerClick(body: Record<string, unknown>): Promise<NextResponse> {
-  const { user_id, card_id, card_name, platform, url } = body;
-
-  const clickId = `click-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-  await supabase.from('cv_affiliate_clicks').insert({
-    click_id: clickId,
-    user_id,
-    card_id,
-    card_name,
-    platform,
-    destination_url: url,
-    clicked_at: new Date().toISOString(),
-  });
-
-  return NextResponse.json({
-    success: true,
-    click_id: clickId,
-  });
-}
-
-// Register conversion (purchase)
-async function registerConversion(body: Record<string, unknown>): Promise<NextResponse> {
-  const { click_id, order_id, amount, platform, items } = body;
-
-  // Get affiliate commission rate
-  const config = AFFILIATE_CONFIG[platform as keyof typeof AFFILIATE_CONFIG];
-  const commission = config ? (amount as number) * config.commission_rate : 0;
+// Track conversion (called by affiliate network webhooks)
+async function trackConversion(body: Record<string, unknown>): Promise<NextResponse> {
+  const { order_id, marketplace, amount, commission, user_id, card_id } = body;
 
   await supabase.from('cv_affiliate_conversions').insert({
-    click_id,
     order_id,
-    amount,
-    commission,
-    platform,
-    items,
+    marketplace,
+    order_amount: amount,
+    commission_amount: commission,
+    user_id,
+    card_id,
     converted_at: new Date().toISOString(),
-    status: 'pending', // pending -> confirmed -> paid
+    status: 'pending',
   });
 
   return NextResponse.json({
     success: true,
-    conversion_recorded: true,
-    estimated_commission: commission,
+    message: 'Conversion tracked',
   });
 }
 
-// Get affiliate earnings (for users who are also affiliates)
-async function getEarnings(userId: string): Promise<NextResponse> {
-  const { data: conversions } = await supabase
-    .from('cv_affiliate_conversions')
-    .select('*')
-    .eq('referred_by', userId)
-    .order('converted_at', { ascending: false });
+// Handle affiliate network webhooks
+async function handleAffiliateWebhook(body: Record<string, unknown>): Promise<NextResponse> {
+  const { network, event_type, data } = body;
 
-  const stats = {
-    total_earnings: 0,
-    pending: 0,
-    confirmed: 0,
-    paid: 0,
-    clicks: 0,
-    conversions: 0,
-    conversion_rate: 0,
-  };
-
-  conversions?.forEach(c => {
-    stats.total_earnings += c.commission || 0;
-    stats.conversions++;
-    if (c.status === 'pending') stats.pending += c.commission || 0;
-    if (c.status === 'confirmed') stats.confirmed += c.commission || 0;
-    if (c.status === 'paid') stats.paid += c.commission || 0;
+  // Log webhook
+  await supabase.from('cv_affiliate_webhooks').insert({
+    network,
+    event_type,
+    payload: data,
+    received_at: new Date().toISOString(),
   });
 
-  // Get click count
-  const { count: clickCount } = await supabase
-    .from('cv_affiliate_clicks')
-    .select('*', { count: 'exact', head: true })
-    .eq('referred_by', userId);
-
-  stats.clicks = clickCount || 0;
-  stats.conversion_rate = stats.clicks > 0 ? (stats.conversions / stats.clicks * 100) : 0;
-
-  return NextResponse.json({
-    success: true,
-    earnings: stats,
-    recent_conversions: conversions?.slice(0, 10) || [],
-  });
-}
-
-// Get overall affiliate stats
-async function getAffiliateStats(userId: string | null): Promise<NextResponse> {
-  // Platform-wide stats
-  const stats = {
-    supported_platforms: Object.keys(AFFILIATE_CONFIG),
-    total_cards_with_links: 50000, // Sample
-    avg_savings: '15%',
-    total_transactions: 25000,
-  };
-
-  // User-specific if provided
-  if (userId) {
-    const { count: userClicks } = await supabase
-      .from('cv_affiliate_clicks')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-
-    return NextResponse.json({
-      success: true,
-      stats,
-      user_stats: {
-        total_clicks: userClicks || 0,
-      },
-    });
+  // Process based on event type
+  if (event_type === 'sale') {
+    await trackConversion(data as Record<string, unknown>);
   }
 
   return NextResponse.json({
     success: true,
-    stats,
+    processed: true,
   });
 }
 
-// Apply for affiliate program
-async function applyForAffiliate(userId: string, body: Record<string, unknown>): Promise<NextResponse> {
-  const { website, social_media, audience_size, promotion_methods } = body;
-
-  const { data: application, error } = await supabase
-    .from('cv_affiliate_applications')
-    .insert({
-      user_id: userId,
-      website,
-      social_media,
-      audience_size,
-      promotion_methods,
-      status: 'pending',
-      applied_at: new Date().toISOString(),
-    })
-    .select()
+// Helper: Get card name from ID
+async function getCardName(cardId: string | null): Promise<string | null> {
+  if (!cardId) return null;
+  
+  const { data } = await supabase
+    .from('cv_cards_master')
+    .select('name')
+    .eq('card_id', cardId)
     .single();
 
-  if (error) throw error;
-
-  return NextResponse.json({
-    success: true,
-    application,
-    message: 'Application received! We will review and respond within 3-5 business days.',
-  });
-}
-
-// Helper: Build TCGPlayer affiliate URL
-function buildTCGPlayerUrl(cardName: string, category: string): string {
-  const config = AFFILIATE_CONFIG.tcgplayer;
-  const searchTerm = encodeURIComponent(cardName);
-  const productLine = mapCategoryToTCGPlayer(category);
-  return `${config.base_url}/search/product?productLineName=${productLine}&q=${searchTerm}&partner=${config.partner_code}&utm_campaign=affiliate&utm_medium=cravcards`;
-}
-
-// Helper: Build eBay affiliate URL
-function buildEbayUrl(cardName: string, category: string): string {
-  const config = AFFILIATE_CONFIG.ebay;
-  const searchTerm = encodeURIComponent(`${cardName} ${category} card`);
-  return `${config.base_url}/sch/i.html?_nkw=${searchTerm}&mkcid=1&mkrid=711-53200-19255-0&siteid=0&campid=${config.campaign_id}&toolid=10001`;
-}
-
-// Helper: Build Amazon affiliate URL
-function buildAmazonUrl(cardName: string, category: string): string {
-  const config = AFFILIATE_CONFIG.amazon;
-  const searchTerm = encodeURIComponent(`${cardName} ${category}`);
-  return `${config.base_url}/s?k=${searchTerm}&tag=${config.tag}`;
-}
-
-// Helper: Build CardMarket URL
-function buildCardMarketUrl(cardName: string, category: string): string {
-  const config = AFFILIATE_CONFIG.cardmarket;
-  const game = mapCategoryToCardMarket(category);
-  const searchTerm = encodeURIComponent(cardName);
-  return `${config.base_url}/en/${game}/Products/Search?searchString=${searchTerm}&ref=${config.partner_id}`;
+  return data?.name || null;
 }
 
 // Helper: Map category to TCGPlayer product line
-function mapCategoryToTCGPlayer(category: string): string {
+function mapCategoryToTCGPlayer(category: string | null): string | null {
   const mapping: Record<string, string> = {
-    pokemon: 'Pokemon',
-    mtg: 'Magic',
-    yugioh: 'YuGiOh',
-    sports: 'Sports',
-    lorcana: 'Disney%20Lorcana',
+    'pokemon': 'Pokemon',
+    'mtg': 'Magic',
+    'yugioh': 'YuGiOh',
+    'sports': 'Sports Cards',
+    'lorcana': 'Disney Lorcana',
   };
-  return mapping[category] || 'All';
+  return category ? mapping[category] || null : null;
 }
 
-// Helper: Map category to CardMarket game
-function mapCategoryToCardMarket(category: string): string {
-  const mapping: Record<string, string> = {
-    pokemon: 'Pokemon',
-    mtg: 'Magic',
-    yugioh: 'YuGiOh',
-    lorcana: 'Lorcana',
-  };
-  return mapping[category] || 'Pokemon';
+// Helper: Get TCGPlayer price estimate
+async function getTCGPlayerPrice(cardName: string | null, category: string | null): Promise<number | null> {
+  if (!cardName) return null;
+  
+  // In production, this would call TCGPlayer API
+  // For now, return estimate based on card type
+  const basePrice = category === 'mtg' ? 15 : category === 'pokemon' ? 12 : 10;
+  return basePrice + Math.random() * 30;
 }
 
-// Helper: Map condition code to display
-function mapConditionDisplay(condition: string): string {
-  const mapping: Record<string, string> = {
-    nm: 'Near Mint',
-    lp: 'Lightly Played',
-    mp: 'Moderately Played',
-    hp: 'Heavily Played',
-    dmg: 'Damaged',
-  };
-  return mapping[condition] || 'Near Mint';
+// Helper: Generate sample listings
+function generateSampleListings(
+  cardName: string,
+  category: string | null,
+  marketplace: string | null
+): MarketplaceListing[] {
+  const marketplaces = marketplace 
+    ? [marketplace] 
+    : ['TCGPlayer', 'eBay', 'CardMarket', 'Troll and Toad'];
+  
+  const conditions = ['Near Mint', 'Lightly Played', 'Moderately Played'];
+  const listings: MarketplaceListing[] = [];
+
+  const basePrice = category === 'mtg' ? 25 : category === 'pokemon' ? 20 : 15;
+
+  for (const mp of marketplaces) {
+    const numListings = 2 + Math.floor(Math.random() * 3);
+    
+    for (let i = 0; i < numListings; i++) {
+      const condition = conditions[Math.floor(Math.random() * conditions.length)];
+      const conditionMultiplier = condition === 'Near Mint' ? 1 : condition === 'Lightly Played' ? 0.85 : 0.7;
+      const price = (basePrice + Math.random() * 20) * conditionMultiplier;
+      
+      listings.push({
+        marketplace: mp,
+        title: `${cardName}${condition !== 'Near Mint' ? ` - ${condition}` : ''}`,
+        price: Math.round(price * 100) / 100,
+        shipping_cost: mp === 'TCGPlayer' ? 0.99 : mp === 'eBay' ? 4.99 : 3.99,
+        condition,
+        seller: `Seller${Math.floor(Math.random() * 1000)}`,
+        seller_rating: 95 + Math.random() * 5,
+        url: generateAffiliateUrl(mp, cardName),
+        image_url: null,
+        quantity_available: 1 + Math.floor(Math.random() * 5),
+      });
+    }
+  }
+
+  return listings.sort((a, b) => (a.price + a.shipping_cost) - (b.price + b.shipping_cost));
 }
 
-// Helper: Generate realistic price
-function generateRealisticPrice(category: string, condition: string): number {
-  const basePrices: Record<string, number> = {
-    pokemon: 15,
-    mtg: 25,
-    yugioh: 10,
-    sports: 20,
-    lorcana: 12,
-  };
-
-  const conditionMultipliers: Record<string, number> = {
-    nm: 1.0,
-    lp: 0.85,
-    mp: 0.7,
-    hp: 0.5,
-    dmg: 0.3,
-  };
-
-  const base = basePrices[category] || 15;
-  const condMult = conditionMultipliers[condition] || 1.0;
-  const variance = 0.5 + Math.random() * 1.5; // 0.5x to 2x variance
-
-  return Math.round(base * condMult * variance * 100) / 100;
-}
-
-// Helper: Log affiliate search
-async function logAffiliateSearch(userId: string, cardId: string, category: string): Promise<void> {
-  try {
-    await supabase.from('cv_affiliate_searches').insert({
-      user_id: userId,
-      card_id: cardId,
-      category,
-      searched_at: new Date().toISOString(),
-    });
-  } catch {
-    // Silently fail
+// Helper: Generate affiliate URL
+function generateAffiliateUrl(marketplace: string, cardName: string): string {
+  const encoded = encodeURIComponent(cardName);
+  
+  switch (marketplace) {
+    case 'TCGPlayer':
+      return `https://www.tcgplayer.com/search/all/product?q=${encoded}&partner=${AFFILIATE_CONFIG.tcgplayer.affiliate_id}`;
+    case 'eBay':
+      return `https://www.ebay.com/sch/i.html?_nkw=${encoded}&campid=${AFFILIATE_CONFIG.ebay.campaign_id}`;
+    case 'Amazon':
+      return `https://www.amazon.com/s?k=${encoded}&tag=${AFFILIATE_CONFIG.amazon.tag}`;
+    default:
+      return `https://www.google.com/search?q=${encoded}+buy`;
   }
 }
 
