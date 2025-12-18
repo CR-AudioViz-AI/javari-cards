@@ -3,7 +3,7 @@
 // Marketplace boost options and promoted cards
 // CravCards - CR AudioViz AI, LLC
 // Created: December 17, 2025
-// Fixed: December 18, 2025 - Better error handling
+// Fixed: December 18, 2025 - Fixed browse action error
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -97,13 +97,14 @@ const FEATURE_PLANS: FeaturePlan[] = [
 
 // GET - Get featured listings or plans
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const action = searchParams.get('action') || 'browse';
-  const category = searchParams.get('category');
-  const userId = searchParams.get('user_id');
-  const limit = parseInt(searchParams.get('limit') || '20');
-
   try {
+    const { searchParams } = new URL(request.url);
+    const action = searchParams.get('action') || 'browse';
+    const category = searchParams.get('category');
+    const userId = searchParams.get('user_id');
+    const limitStr = searchParams.get('limit');
+    const limit = limitStr ? parseInt(limitStr, 10) : 20;
+
     switch (action) {
       case 'browse':
         return browseFeaturedListings(category, limit);
@@ -150,25 +151,40 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Browse featured listings
+// Browse featured listings - generate sample data
 function browseFeaturedListings(category: string | null, limit: number): NextResponse {
-  const listings = generateSampleListings(category, limit);
-  return NextResponse.json({
-    success: true,
-    listings,
-    total: listings.length,
-    sample_data: true,
-  });
+  try {
+    const listings = generateSampleListings(category, limit);
+    return NextResponse.json({
+      success: true,
+      listings,
+      total: listings.length,
+      sample_data: true,
+    });
+  } catch (err) {
+    return NextResponse.json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to generate listings',
+    }, { status: 500 });
+  }
 }
 
 // Get spotlight (premium) listings
 function getSpotlightListings(category: string | null): NextResponse {
-  const listings = generateSampleListings(category, 6).map(l => ({ ...l, feature_type: 'spotlight' as const }));
-  return NextResponse.json({
-    success: true,
-    spotlight: listings,
-    sample_data: true,
-  });
+  try {
+    const listings = generateSampleListings(category, 6);
+    const spotlightListings = listings.map(l => ({ ...l, feature_type: 'spotlight' as const }));
+    return NextResponse.json({
+      success: true,
+      spotlight: spotlightListings,
+      sample_data: true,
+    });
+  } catch (err) {
+    return NextResponse.json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to generate spotlight',
+    }, { status: 500 });
+  }
 }
 
 // Get feature plans
@@ -205,7 +221,6 @@ function getMyFeaturedListings(userId: string | null): NextResponse {
     total_views: 0,
     total_clicks: 0,
     total_inquiries: 0,
-    message: 'No featured listings yet',
   });
 }
 
@@ -288,22 +303,24 @@ function generateSampleListings(category: string | null, count: number): Feature
 
   for (let i = 0; i < count; i++) {
     const cat = categories[i % categories.length];
-    const cards = sampleCards[cat] || [];
-    const cardName = cards[i % cards.length] || 'Featured Card';
+    const cards = sampleCards[cat] || ['Featured Card'];
+    const cardName = cards[i % cards.length];
     const featureType = featureTypes[i % featureTypes.length];
+    const basePrice = 50 + (Math.random() * 500);
+    const isGraded = Math.random() > 0.6;
     
     listings.push({
-      id: `listing-${i}`,
-      user_id: `seller-${i}`,
-      card_id: `${cat}-${cardName.toLowerCase().replace(/\s+/g, '-')}`,
+      id: `listing-${i + 1}`,
+      user_id: `seller-${i + 1}`,
+      card_id: `${cat}-${cardName.toLowerCase().replace(/\s+/g, '-')}-${i}`,
       card_name: cardName,
       category: cat,
       set_name: 'Various',
       image_url: null,
-      price: 50 + Math.random() * 500,
+      price: Math.round(basePrice * 100) / 100,
       condition: Math.random() > 0.3 ? 'Near Mint' : 'Lightly Played',
-      graded: Math.random() > 0.6,
-      grade: Math.random() > 0.6 ? '9.5' : null,
+      graded: isGraded,
+      grade: isGraded ? '9.5' : null,
       description: `Beautiful ${cardName} for sale!`,
       feature_type: featureType,
       start_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
@@ -313,7 +330,7 @@ function generateSampleListings(category: string | null, count: number): Feature
       clicks: Math.floor(Math.random() * 50),
       inquiries: Math.floor(Math.random() * 10),
       seller_name: `Seller${i + 1}`,
-      seller_rating: 4.5 + Math.random() * 0.5,
+      seller_rating: Math.round((4.5 + Math.random() * 0.5) * 10) / 10,
       seller_sales: Math.floor(Math.random() * 100),
     });
   }
