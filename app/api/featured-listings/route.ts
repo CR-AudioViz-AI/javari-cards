@@ -1,6 +1,6 @@
 // ============================================================================
 // FEATURED LISTINGS API
-// Marketplace boost options for sellers
+// Marketplace boost options and promoted cards
 // CravCards - CR AudioViz AI, LLC
 // Created: December 17, 2025
 // ============================================================================
@@ -13,96 +13,98 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-interface BoostPackage {
-  id: string;
-  name: string;
-  description: string;
-  duration_days: number;
-  price: number;
-  features: string[];
-  visibility_multiplier: number;
-  badge: string;
-  color: string;
-}
-
 interface FeaturedListing {
   id: string;
   user_id: string;
   card_id: string;
   card_name: string;
   category: string;
+  set_name: string;
   image_url: string | null;
-  asking_price: number;
+  price: number;
   condition: string;
+  graded: boolean;
+  grade: string | null;
   description: string;
-  boost_package: string;
-  boost_start: string;
-  boost_end: string;
-  views: number;
-  inquiries: number;
+  
+  // Featuring details
+  feature_type: 'standard' | 'premium' | 'spotlight';
+  start_date: string;
+  end_date: string;
   is_active: boolean;
-  seller: {
-    username: string;
-    rating: number;
-    total_sales: number;
-  };
+  views: number;
+  clicks: number;
+  inquiries: number;
+  
+  // Seller info
+  seller_name: string;
+  seller_rating: number;
+  seller_sales: number;
 }
 
-const BOOST_PACKAGES: BoostPackage[] = [
+interface FeaturePlan {
+  id: string;
+  name: string;
+  duration_days: number;
+  price: number;
+  features: string[];
+  placement: string[];
+  estimated_views: string;
+  boost_multiplier: number;
+}
+
+// Feature plans
+const FEATURE_PLANS: FeaturePlan[] = [
   {
-    id: 'basic',
-    name: 'Basic Boost',
-    description: 'Get noticed with basic highlighting',
+    id: 'standard',
+    name: 'Standard Boost',
     duration_days: 7,
-    price: 2.99,
+    price: 4.99,
     features: [
-      'Highlighted border',
-      '2x visibility in search',
+      'Featured badge on listing',
+      'Priority in category search',
       'Basic analytics',
     ],
-    visibility_multiplier: 2,
-    badge: '⭐',
-    color: 'blue',
+    placement: ['Category pages', 'Search results'],
+    estimated_views: '500-1,000',
+    boost_multiplier: 2,
   },
   {
     id: 'premium',
     name: 'Premium Boost',
-    description: 'Stand out with premium placement',
     duration_days: 14,
-    price: 7.99,
+    price: 14.99,
     features: [
-      'Premium gold border',
-      '5x visibility in search',
-      'Featured on category page',
-      'Priority in recommendations',
+      'Everything in Standard',
+      'Homepage rotation',
+      'Email newsletter inclusion',
+      'Social media feature',
       'Detailed analytics',
     ],
-    visibility_multiplier: 5,
-    badge: '💫',
-    color: 'gold',
+    placement: ['Homepage', 'Category pages', 'Search results', 'Newsletter'],
+    estimated_views: '2,000-5,000',
+    boost_multiplier: 5,
   },
   {
     id: 'spotlight',
-    name: 'Spotlight',
-    description: 'Maximum exposure for high-value cards',
+    name: 'Spotlight Feature',
     duration_days: 30,
-    price: 19.99,
+    price: 49.99,
     features: [
-      'Spotlight animation',
-      '10x visibility in search',
-      'Homepage feature rotation',
-      'Featured in newsletter',
-      'Social media promotion',
-      'Complete analytics suite',
-      'Dedicated support',
+      'Everything in Premium',
+      'Dedicated spotlight section',
+      'Push notification to interested buyers',
+      'Priority in recommendations',
+      'Seller verification badge',
+      'Full analytics dashboard',
     ],
-    visibility_multiplier: 10,
-    badge: '🔥',
-    color: 'red',
+    placement: ['Spotlight section', 'All pages', 'Push notifications', 'Email blasts'],
+    estimated_views: '10,000+',
+    boost_multiplier: 10,
   },
 ];
 
-// GET - Get featured listings or packages
+// GET - Get featured listings or plans
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'browse';
@@ -112,23 +114,18 @@ export async function GET(request: NextRequest) {
 
   try {
     switch (action) {
-      case 'packages':
-        return getBoostPackages();
       case 'browse':
-        return browseFeaturedListings(category, limit);
+        return await browseFeaturedListings(category, limit);
+      case 'spotlight':
+        return await getSpotlightListings(category);
+      case 'plans':
+        return getFeaturePlans();
       case 'my-listings':
-        if (!userId) {
-          return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
-        }
-        return getMyListings(userId);
-      case 'stats':
-        const listingId = searchParams.get('listing_id');
-        if (!listingId) {
-          return NextResponse.json({ success: false, error: 'Listing ID required' }, { status: 400 });
-        }
-        return getListingStats(listingId, userId);
-      case 'homepage':
-        return getHomepageFeatured();
+        if (!userId) return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
+        return await getMyFeaturedListings(userId);
+      case 'analytics':
+        if (!userId) return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
+        return await getListingAnalytics(userId, searchParams.get('listing_id'));
       default:
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
@@ -142,7 +139,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, user_id } = body;
+    const { user_id, action } = body;
 
     if (!user_id) {
       return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
@@ -151,16 +148,18 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'create':
         return await createFeaturedListing(user_id, body);
-      case 'boost':
-        return await boostListing(user_id, body);
-      case 'update':
-        return await updateListing(user_id, body);
-      case 'end':
-        return await endListing(user_id, body.listing_id);
       case 'renew':
-        return await renewBoost(user_id, body);
-      case 'inquiry':
-        return await sendInquiry(body);
+        return await renewListing(user_id, body.listing_id, body.plan_id);
+      case 'cancel':
+        return await cancelListing(user_id, body.listing_id);
+      case 'update':
+        return await updateListing(user_id, body.listing_id, body.updates);
+      case 'record-view':
+        return await recordView(body.listing_id);
+      case 'record-click':
+        return await recordClick(body.listing_id, user_id);
+      case 'inquire':
+        return await createInquiry(body.listing_id, user_id, body.message);
       default:
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
@@ -170,40 +169,15 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Get available boost packages
-function getBoostPackages(): NextResponse {
-  return NextResponse.json({
-    success: true,
-    packages: BOOST_PACKAGES,
-    comparison: {
-      headers: ['Feature', 'Basic', 'Premium', 'Spotlight'],
-      rows: [
-        ['Duration', '7 days', '14 days', '30 days'],
-        ['Price', '$2.99', '$7.99', '$19.99'],
-        ['Visibility Boost', '2x', '5x', '10x'],
-        ['Search Priority', '✅', '✅', '✅'],
-        ['Category Feature', '❌', '✅', '✅'],
-        ['Homepage Feature', '❌', '❌', '✅'],
-        ['Newsletter', '❌', '❌', '✅'],
-        ['Social Promo', '❌', '❌', '✅'],
-      ],
-    },
-    tips: [
-      'Higher-value cards benefit most from Spotlight',
-      'Premium is best for mid-range cards',
-      'Basic works great for completing sales quickly',
-    ],
-  });
-}
-
 // Browse featured listings
 async function browseFeaturedListings(category: string | null, limit: number): Promise<NextResponse> {
   let query = supabase
     .from('cv_featured_listings')
     .select('*')
     .eq('is_active', true)
-    .gt('boost_end', new Date().toISOString())
-    .order('boost_package', { ascending: false }) // Spotlight first
+    .lte('start_date', new Date().toISOString())
+    .gte('end_date', new Date().toISOString())
+    .order('feature_type', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limit);
 
@@ -213,192 +187,220 @@ async function browseFeaturedListings(category: string | null, limit: number): P
 
   const { data: listings, error } = await query;
 
-  // Generate sample data if none exists
+  if (error && error.code !== 'PGRST116') throw error;
+
+  // If no real listings, generate samples
   if (!listings || listings.length === 0) {
-    const sampleListings = generateSampleListings(category, limit);
     return NextResponse.json({
       success: true,
-      listings: sampleListings,
-      total: sampleListings.length,
+      listings: generateSampleListings(category, limit),
+      total: limit,
       sample_data: true,
     });
   }
 
-  // Enrich with seller info
-  const enrichedListings = await Promise.all(
-    listings.map(async (listing) => {
-      const seller = await getSellerInfo(listing.user_id);
-      return {
-        ...listing,
-        seller,
-        boost_badge: BOOST_PACKAGES.find(p => p.id === listing.boost_package)?.badge || '',
-      };
-    })
-  );
-
   return NextResponse.json({
     success: true,
-    listings: enrichedListings,
-    total: enrichedListings.length,
+    listings,
+    total: listings.length,
   });
 }
 
-// Get user's listings
-async function getMyListings(userId: string): Promise<NextResponse> {
+// Get spotlight (premium) listings
+async function getSpotlightListings(category: string | null): Promise<NextResponse> {
+  let query = supabase
+    .from('cv_featured_listings')
+    .select('*')
+    .eq('is_active', true)
+    .eq('feature_type', 'spotlight')
+    .lte('start_date', new Date().toISOString())
+    .gte('end_date', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(6);
+
+  if (category) {
+    query = query.eq('category', category);
+  }
+
+  const { data: listings, error } = await query;
+
+  if (error && error.code !== 'PGRST116') throw error;
+
+  // Generate samples if none
+  if (!listings || listings.length === 0) {
+    return NextResponse.json({
+      success: true,
+      spotlight: generateSampleListings(category, 6).map(l => ({ ...l, feature_type: 'spotlight' })),
+      sample_data: true,
+    });
+  }
+
+  return NextResponse.json({
+    success: true,
+    spotlight: listings,
+  });
+}
+
+// Get feature plans
+function getFeaturePlans(): NextResponse {
+  return NextResponse.json({
+    success: true,
+    plans: FEATURE_PLANS,
+    comparison: {
+      headers: ['Feature', 'Standard', 'Premium', 'Spotlight'],
+      rows: [
+        ['Duration', '7 days', '14 days', '30 days'],
+        ['Price', '$4.99', '$14.99', '$49.99'],
+        ['Est. Views', '500-1K', '2-5K', '10K+'],
+        ['Homepage', '❌', '✅', '✅'],
+        ['Newsletter', '❌', '✅', '✅'],
+        ['Push Notifications', '❌', '❌', '✅'],
+        ['Analytics', 'Basic', 'Detailed', 'Full Dashboard'],
+      ],
+    },
+  });
+}
+
+// Get user's featured listings
+async function getMyFeaturedListings(userId: string): Promise<NextResponse> {
   const { data: listings } = await supabase
     .from('cv_featured_listings')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
-  const active = listings?.filter(l => l.is_active && new Date(l.boost_end) > new Date()) || [];
-  const expired = listings?.filter(l => !l.is_active || new Date(l.boost_end) <= new Date()) || [];
-
-  // Calculate stats
-  const totalViews = listings?.reduce((sum, l) => sum + (l.views || 0), 0) || 0;
-  const totalInquiries = listings?.reduce((sum, l) => sum + (l.inquiries || 0), 0) || 0;
-  const totalSpent = listings?.reduce((sum, l) => {
-    const pkg = BOOST_PACKAGES.find(p => p.id === l.boost_package);
-    return sum + (pkg?.price || 0);
-  }, 0) || 0;
+  const active = listings?.filter(l => l.is_active && new Date(l.end_date) > new Date()) || [];
+  const expired = listings?.filter(l => !l.is_active || new Date(l.end_date) <= new Date()) || [];
 
   return NextResponse.json({
     success: true,
-    active_listings: active,
-    expired_listings: expired.slice(0, 10),
-    stats: {
-      total_listings: listings?.length || 0,
-      active_count: active.length,
-      total_views: totalViews,
-      total_inquiries: totalInquiries,
-      total_spent: Math.round(totalSpent * 100) / 100,
-      avg_views_per_listing: listings?.length ? Math.round(totalViews / listings.length) : 0,
-    },
+    active,
+    expired,
+    total_active: active.length,
+    total_views: listings?.reduce((sum, l) => sum + (l.views || 0), 0) || 0,
+    total_clicks: listings?.reduce((sum, l) => sum + (l.clicks || 0), 0) || 0,
+    total_inquiries: listings?.reduce((sum, l) => sum + (l.inquiries || 0), 0) || 0,
   });
 }
 
-// Get listing stats
-async function getListingStats(listingId: string, userId: string | null): Promise<NextResponse> {
+// Get analytics for a listing
+async function getListingAnalytics(userId: string, listingId: string | null): Promise<NextResponse> {
+  if (!listingId) {
+    // Get aggregate analytics
+    const { data: listings } = await supabase
+      .from('cv_featured_listings')
+      .select('views, clicks, inquiries, feature_type, start_date, end_date')
+      .eq('user_id', userId);
+
+    return NextResponse.json({
+      success: true,
+      aggregate: {
+        total_listings: listings?.length || 0,
+        total_views: listings?.reduce((sum, l) => sum + (l.views || 0), 0) || 0,
+        total_clicks: listings?.reduce((sum, l) => sum + (l.clicks || 0), 0) || 0,
+        total_inquiries: listings?.reduce((sum, l) => sum + (l.inquiries || 0), 0) || 0,
+        avg_ctr: listings && listings.length > 0
+          ? (listings.reduce((sum, l) => sum + (l.clicks || 0), 0) / Math.max(listings.reduce((sum, l) => sum + (l.views || 0), 0), 1) * 100).toFixed(2)
+          : 0,
+      },
+    });
+  }
+
+  // Get specific listing analytics
   const { data: listing } = await supabase
     .from('cv_featured_listings')
     .select('*')
     .eq('id', listingId)
+    .eq('user_id', userId)
     .single();
 
   if (!listing) {
     return NextResponse.json({ success: false, error: 'Listing not found' }, { status: 404 });
   }
 
-  // Verify ownership if userId provided
-  if (userId && listing.user_id !== userId) {
-    return NextResponse.json({ success: false, error: 'Not authorized' }, { status: 403 });
-  }
-
-  // Get daily views
-  const { data: dailyViews } = await supabase
-    .from('cv_listing_views')
-    .select('viewed_at')
-    .eq('listing_id', listingId)
-    .gte('viewed_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
-
-  // Aggregate by day
-  const viewsByDay: Record<string, number> = {};
-  dailyViews?.forEach(v => {
-    const day = v.viewed_at.split('T')[0];
-    viewsByDay[day] = (viewsByDay[day] || 0) + 1;
-  });
-
-  const boostPackage = BOOST_PACKAGES.find(p => p.id === listing.boost_package);
-  const daysRemaining = Math.max(0, Math.ceil((new Date(listing.boost_end).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+  // Get daily breakdown (mock for now)
+  const dailyStats = generateDailyStats(listing.start_date, listing.end_date, listing.views, listing.clicks);
 
   return NextResponse.json({
     success: true,
     listing,
-    stats: {
-      total_views: listing.views || 0,
-      total_inquiries: listing.inquiries || 0,
-      conversion_rate: listing.views ? ((listing.inquiries || 0) / listing.views * 100).toFixed(2) : 0,
-      views_by_day: viewsByDay,
-      days_remaining: daysRemaining,
-      boost_package: boostPackage,
-      estimated_impressions: (listing.views || 0) * (boostPackage?.visibility_multiplier || 1),
+    analytics: {
+      views: listing.views || 0,
+      clicks: listing.clicks || 0,
+      inquiries: listing.inquiries || 0,
+      ctr: listing.views ? ((listing.clicks || 0) / listing.views * 100).toFixed(2) : 0,
+      inquiry_rate: listing.clicks ? ((listing.inquiries || 0) / listing.clicks * 100).toFixed(2) : 0,
+      days_remaining: Math.max(0, Math.ceil((new Date(listing.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))),
     },
-  });
-}
-
-// Get homepage featured listings
-async function getHomepageFeatured(): Promise<NextResponse> {
-  // Get spotlight listings for homepage
-  const { data: spotlights } = await supabase
-    .from('cv_featured_listings')
-    .select('*')
-    .eq('is_active', true)
-    .eq('boost_package', 'spotlight')
-    .gt('boost_end', new Date().toISOString())
-    .order('views', { ascending: false })
-    .limit(6);
-
-  // Get category highlights
-  const categories = ['pokemon', 'mtg', 'sports', 'yugioh'];
-  const categoryHighlights: Record<string, FeaturedListing[]> = {};
-
-  for (const cat of categories) {
-    const { data: catListings } = await supabase
-      .from('cv_featured_listings')
-      .select('*')
-      .eq('is_active', true)
-      .eq('category', cat)
-      .gt('boost_end', new Date().toISOString())
-      .order('boost_package', { ascending: false })
-      .limit(4);
-
-    categoryHighlights[cat] = catListings || [];
-  }
-
-  return NextResponse.json({
-    success: true,
-    spotlight: spotlights || generateSampleListings(null, 6),
-    by_category: categoryHighlights,
+    daily_breakdown: dailyStats,
   });
 }
 
 // Create featured listing
-async function createFeaturedListing(userId: string, body: Record<string, unknown>): Promise<NextResponse> {
-  const { card_id, card_name, category, image_url, asking_price, condition, description, boost_package } = body;
+async function createFeaturedListing(userId: string, data: Record<string, unknown>): Promise<NextResponse> {
+  const { card_id, plan_id, price, description } = data;
 
-  if (!card_id || !asking_price || !boost_package) {
+  if (!card_id || !plan_id) {
     return NextResponse.json({
       success: false,
-      error: 'card_id, asking_price, and boost_package required',
+      error: 'Card ID and plan required',
     }, { status: 400 });
   }
 
-  const pkg = BOOST_PACKAGES.find(p => p.id === boost_package);
-  if (!pkg) {
-    return NextResponse.json({ success: false, error: 'Invalid boost package' }, { status: 400 });
+  const plan = FEATURE_PLANS.find(p => p.id === plan_id);
+  if (!plan) {
+    return NextResponse.json({ success: false, error: 'Invalid plan' }, { status: 400 });
   }
 
-  // Calculate boost end date
-  const boostEnd = new Date();
-  boostEnd.setDate(boostEnd.getDate() + pkg.duration_days);
+  // Get card details
+  const { data: card } = await supabase
+    .from('cv_user_cards')
+    .select('*')
+    .eq('card_id', card_id)
+    .eq('user_id', userId)
+    .single();
+
+  if (!card) {
+    return NextResponse.json({
+      success: false,
+      error: 'Card not found in your collection',
+    }, { status: 404 });
+  }
+
+  // Get seller info
+  const { data: profile } = await supabase
+    .from('cv_user_profiles')
+    .select('username, display_name, seller_rating, total_sales')
+    .eq('user_id', userId)
+    .single();
+
+  const startDate = new Date();
+  const endDate = new Date(startDate.getTime() + plan.duration_days * 24 * 60 * 60 * 1000);
 
   const { data: listing, error } = await supabase
     .from('cv_featured_listings')
     .insert({
       user_id: userId,
       card_id,
-      card_name: card_name || 'Unknown Card',
-      category: category || 'other',
-      image_url,
-      asking_price,
-      condition: condition || 'nm',
+      card_name: card.card_name,
+      category: card.category,
+      set_name: card.set_name,
+      image_url: card.image_url,
+      price: price || card.current_value,
+      condition: card.condition,
+      graded: card.is_graded,
+      grade: card.grade,
       description: description || '',
-      boost_package,
-      boost_start: new Date().toISOString(),
-      boost_end: boostEnd.toISOString(),
-      views: 0,
-      inquiries: 0,
+      feature_type: plan_id,
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString(),
       is_active: true,
+      views: 0,
+      clicks: 0,
+      inquiries: 0,
+      seller_name: profile?.display_name || profile?.username || 'Seller',
+      seller_rating: profile?.seller_rating || 0,
+      seller_sales: profile?.total_sales || 0,
       created_at: new Date().toISOString(),
     })
     .select()
@@ -409,81 +411,61 @@ async function createFeaturedListing(userId: string, body: Record<string, unknow
   return NextResponse.json({
     success: true,
     listing,
-    package: pkg,
-    message: `Listing created with ${pkg.name}! Active for ${pkg.duration_days} days.`,
-    charge: pkg.price,
+    plan,
+    cost: plan.price,
+    message: `Card featured for ${plan.duration_days} days`,
   });
 }
 
-// Boost an existing listing
-async function boostListing(userId: string, body: Record<string, unknown>): Promise<NextResponse> {
-  const { listing_id, boost_package } = body;
-
-  const pkg = BOOST_PACKAGES.find(p => p.id === boost_package);
-  if (!pkg) {
-    return NextResponse.json({ success: false, error: 'Invalid boost package' }, { status: 400 });
+// Renew listing
+async function renewListing(userId: string, listingId: string, planId: string): Promise<NextResponse> {
+  const plan = FEATURE_PLANS.find(p => p.id === planId);
+  if (!plan) {
+    return NextResponse.json({ success: false, error: 'Invalid plan' }, { status: 400 });
   }
 
-  const boostEnd = new Date();
-  boostEnd.setDate(boostEnd.getDate() + pkg.duration_days);
+  const { data: listing } = await supabase
+    .from('cv_featured_listings')
+    .select('end_date')
+    .eq('id', listingId)
+    .eq('user_id', userId)
+    .single();
 
-  const { data: listing, error } = await supabase
+  if (!listing) {
+    return NextResponse.json({ success: false, error: 'Listing not found' }, { status: 404 });
+  }
+
+  // Extend from current end date or now, whichever is later
+  const extendFrom = new Date(Math.max(new Date(listing.end_date).getTime(), Date.now()));
+  const newEndDate = new Date(extendFrom.getTime() + plan.duration_days * 24 * 60 * 60 * 1000);
+
+  const { error } = await supabase
     .from('cv_featured_listings')
     .update({
-      boost_package,
-      boost_start: new Date().toISOString(),
-      boost_end: boostEnd.toISOString(),
+      feature_type: planId,
+      end_date: newEndDate.toISOString(),
       is_active: true,
+      updated_at: new Date().toISOString(),
     })
-    .eq('id', listing_id)
-    .eq('user_id', userId)
-    .select()
-    .single();
+    .eq('id', listingId);
 
   if (error) throw error;
 
   return NextResponse.json({
     success: true,
-    listing,
-    package: pkg,
-    message: `Listing boosted with ${pkg.name}!`,
-    charge: pkg.price,
+    new_end_date: newEndDate.toISOString(),
+    cost: plan.price,
+    message: `Listing renewed for ${plan.duration_days} more days`,
   });
 }
 
-// Update listing
-async function updateListing(userId: string, body: Record<string, unknown>): Promise<NextResponse> {
-  const { listing_id, asking_price, condition, description } = body;
-
-  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (asking_price !== undefined) updates.asking_price = asking_price;
-  if (condition !== undefined) updates.condition = condition;
-  if (description !== undefined) updates.description = description;
-
-  const { data: listing, error } = await supabase
-    .from('cv_featured_listings')
-    .update(updates)
-    .eq('id', listing_id)
-    .eq('user_id', userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return NextResponse.json({
-    success: true,
-    listing,
-    message: 'Listing updated',
-  });
-}
-
-// End listing early
-async function endListing(userId: string, listingId: string): Promise<NextResponse> {
+// Cancel listing
+async function cancelListing(userId: string, listingId: string): Promise<NextResponse> {
   const { error } = await supabase
     .from('cv_featured_listings')
     .update({
       is_active: false,
-      ended_at: new Date().toISOString(),
+      cancelled_at: new Date().toISOString(),
     })
     .eq('id', listingId)
     .eq('user_id', userId);
@@ -492,150 +474,160 @@ async function endListing(userId: string, listingId: string): Promise<NextRespon
 
   return NextResponse.json({
     success: true,
-    message: 'Listing ended',
+    message: 'Listing cancelled',
   });
 }
 
-// Renew boost
-async function renewBoost(userId: string, body: Record<string, unknown>): Promise<NextResponse> {
-  const { listing_id, boost_package } = body;
+// Update listing
+async function updateListing(userId: string, listingId: string, updates: Record<string, unknown>): Promise<NextResponse> {
+  const allowedUpdates = ['price', 'description'];
+  const filteredUpdates: Record<string, unknown> = {};
+  
+  for (const key of allowedUpdates) {
+    if (updates[key] !== undefined) {
+      filteredUpdates[key] = updates[key];
+    }
+  }
+  filteredUpdates.updated_at = new Date().toISOString();
 
-  // Get current listing
-  const { data: current } = await supabase
+  const { data, error } = await supabase
     .from('cv_featured_listings')
-    .select('boost_end')
-    .eq('id', listing_id)
+    .update(filteredUpdates)
+    .eq('id', listingId)
     .eq('user_id', userId)
+    .select()
     .single();
 
-  if (!current) {
+  if (error) throw error;
+
+  return NextResponse.json({
+    success: true,
+    listing: data,
+  });
+}
+
+// Record view
+async function recordView(listingId: string): Promise<NextResponse> {
+  await supabase.rpc('increment_listing_views', { listing_id: listingId });
+
+  return NextResponse.json({ success: true });
+}
+
+// Record click
+async function recordClick(listingId: string, userId: string): Promise<NextResponse> {
+  await supabase.rpc('increment_listing_clicks', { listing_id: listingId });
+
+  await supabase.from('cv_listing_clicks').insert({
+    listing_id: listingId,
+    user_id: userId,
+    clicked_at: new Date().toISOString(),
+  });
+
+  return NextResponse.json({ success: true });
+}
+
+// Create inquiry
+async function createInquiry(listingId: string, userId: string, message: string): Promise<NextResponse> {
+  const { data: listing } = await supabase
+    .from('cv_featured_listings')
+    .select('user_id, card_name')
+    .eq('id', listingId)
+    .single();
+
+  if (!listing) {
     return NextResponse.json({ success: false, error: 'Listing not found' }, { status: 404 });
   }
 
-  const pkg = BOOST_PACKAGES.find(p => p.id === (boost_package || 'basic'));
-  if (!pkg) {
-    return NextResponse.json({ success: false, error: 'Invalid boost package' }, { status: 400 });
-  }
-
-  // Extend from current end date
-  const currentEnd = new Date(current.boost_end);
-  const newEnd = new Date(Math.max(currentEnd.getTime(), Date.now()));
-  newEnd.setDate(newEnd.getDate() + pkg.duration_days);
-
-  const { data: listing, error } = await supabase
-    .from('cv_featured_listings')
-    .update({
-      boost_package: boost_package || 'basic',
-      boost_end: newEnd.toISOString(),
-      is_active: true,
-    })
-    .eq('id', listing_id)
-    .eq('user_id', userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return NextResponse.json({
-    success: true,
-    listing,
-    message: `Boost renewed! New end date: ${newEnd.toLocaleDateString()}`,
-    charge: pkg.price,
+  await supabase.from('cv_listing_inquiries').insert({
+    listing_id: listingId,
+    seller_id: listing.user_id,
+    buyer_id: userId,
+    message,
+    created_at: new Date().toISOString(),
   });
-}
 
-// Send inquiry
-async function sendInquiry(body: Record<string, unknown>): Promise<NextResponse> {
-  const { listing_id, buyer_id, message } = body;
-
-  // Update inquiry count
-  await supabase.rpc('increment_inquiries', { listing_id });
-
-  // Create inquiry record
-  const { data: inquiry, error } = await supabase
-    .from('cv_listing_inquiries')
-    .insert({
-      listing_id,
-      buyer_id,
-      message,
-      sent_at: new Date().toISOString(),
-      status: 'pending',
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
+  await supabase.rpc('increment_listing_inquiries', { listing_id: listingId });
 
   return NextResponse.json({
     success: true,
-    inquiry,
     message: 'Inquiry sent to seller',
   });
 }
 
-// Helper: Get seller info
-async function getSellerInfo(userId: string): Promise<{ username: string; rating: number; total_sales: number }> {
-  const { data: profile } = await supabase
-    .from('cv_user_profiles')
-    .select('username, seller_rating, total_sales')
-    .eq('user_id', userId)
-    .single();
-
-  return {
-    username: profile?.username || 'Seller',
-    rating: profile?.seller_rating || 4.5,
-    total_sales: profile?.total_sales || 0,
-  };
-}
-
 // Helper: Generate sample listings
-function generateSampleListings(category: string | null, limit: number): FeaturedListing[] {
+function generateSampleListings(category: string | null, count: number): FeaturedListing[] {
   const categories = category ? [category] : ['pokemon', 'mtg', 'sports', 'yugioh'];
-  const cardNames: Record<string, string[]> = {
-    pokemon: ['Charizard VMAX', 'Pikachu VMAX', 'Umbreon VMAX Alt Art', 'Mew ex SAR'],
-    mtg: ['Black Lotus', 'Mox Ruby', 'Force of Will', 'Ragavan'],
-    sports: ['Michael Jordan RC', 'Tom Brady RC', 'LeBron James RC', 'Wembanyama RC'],
-    yugioh: ['Blue-Eyes White Dragon', 'Dark Magician', 'Exodia', 'Starlight Rare'],
+  const sampleCards: Record<string, string[]> = {
+    pokemon: ['Charizard VMAX', 'Pikachu VMAX', 'Umbreon VMAX Alt Art', 'Moonbreon'],
+    mtg: ['Black Lotus', 'Mox Sapphire', 'Force of Will', 'Ragavan'],
+    sports: ['Michael Jordan RC', 'Mickey Mantle 1952', 'LeBron James RC'],
+    yugioh: ['Blue-Eyes White Dragon', 'Dark Magician', 'Exodia'],
   };
 
   const listings: FeaturedListing[] = [];
-  const packages = ['spotlight', 'premium', 'basic'];
+  const featureTypes: Array<'standard' | 'premium' | 'spotlight'> = ['spotlight', 'premium', 'standard'];
 
-  for (let i = 0; i < limit; i++) {
+  for (let i = 0; i < count; i++) {
     const cat = categories[i % categories.length];
-    const names = cardNames[cat] || cardNames.pokemon;
-    const name = names[i % names.length];
-    const pkg = packages[i % packages.length];
-    const pkgDetails = BOOST_PACKAGES.find(p => p.id === pkg)!;
-
-    const boostEnd = new Date();
-    boostEnd.setDate(boostEnd.getDate() + Math.floor(Math.random() * pkgDetails.duration_days));
-
+    const cards = sampleCards[cat] || [];
+    const cardName = cards[i % cards.length] || 'Featured Card';
+    const featureType = featureTypes[i % featureTypes.length];
+    
     listings.push({
-      id: `sample-${i}`,
+      id: `listing-${i}`,
       user_id: `seller-${i}`,
-      card_id: `${cat}-${name.toLowerCase().replace(/\s+/g, '-')}`,
-      card_name: name,
+      card_id: `${cat}-${cardName.toLowerCase().replace(/\s+/g, '-')}`,
+      card_name: cardName,
       category: cat,
+      set_name: 'Various',
       image_url: null,
-      asking_price: 50 + Math.random() * 500,
-      condition: 'nm',
-      description: `High-quality ${name} for sale. Excellent condition.`,
-      boost_package: pkg,
-      boost_start: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-      boost_end: boostEnd.toISOString(),
-      views: Math.floor(Math.random() * 500),
-      inquiries: Math.floor(Math.random() * 20),
+      price: 50 + Math.random() * 500,
+      condition: Math.random() > 0.3 ? 'Near Mint' : 'Lightly Played',
+      graded: Math.random() > 0.6,
+      grade: Math.random() > 0.6 ? '9.5' : null,
+      description: `Beautiful ${cardName} for sale!`,
+      feature_type: featureType,
+      start_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       is_active: true,
-      seller: {
-        username: `collector${i + 1}`,
-        rating: 4.5 + Math.random() * 0.5,
-        total_sales: Math.floor(Math.random() * 100),
-      },
+      views: Math.floor(Math.random() * 500),
+      clicks: Math.floor(Math.random() * 50),
+      inquiries: Math.floor(Math.random() * 10),
+      seller_name: `Seller${i + 1}`,
+      seller_rating: 4.5 + Math.random() * 0.5,
+      seller_sales: Math.floor(Math.random() * 100),
     });
   }
 
   return listings;
+}
+
+// Helper: Generate daily stats
+function generateDailyStats(startDate: string, endDate: string, totalViews: number, totalClicks: number): Array<{date: string; views: number; clicks: number}> {
+  const stats = [];
+  const start = new Date(startDate);
+  const end = new Date(Math.min(new Date(endDate).getTime(), Date.now()));
+  const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  
+  let remainingViews = totalViews || 0;
+  let remainingClicks = totalClicks || 0;
+  
+  for (let i = 0; i < days; i++) {
+    const date = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
+    const dayViews = i === days - 1 ? remainingViews : Math.floor(remainingViews * Math.random() * 0.3);
+    const dayClicks = i === days - 1 ? remainingClicks : Math.floor(remainingClicks * Math.random() * 0.3);
+    
+    stats.push({
+      date: date.toISOString().split('T')[0],
+      views: dayViews,
+      clicks: dayClicks,
+    });
+    
+    remainingViews -= dayViews;
+    remainingClicks -= dayClicks;
+  }
+  
+  return stats;
 }
 
 export const dynamic = 'force-dynamic';
