@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useAuth } from '@/components/AuthProvider'
 import { Sparkles, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 
-export default function LoginPage() {
+// Inner component that uses useSearchParams
+function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') || '/dashboard'
@@ -43,8 +44,9 @@ export default function LoginPage() {
       if (data.user) {
         router.push(redirectTo)
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign in')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to sign in'
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -60,8 +62,9 @@ export default function LoginPage() {
         },
       })
       if (error) throw error
-    } catch (err: any) {
-      setError(err.message || `Failed to sign in with ${provider}`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : `Failed to sign in with ${provider}`
+      setError(message)
       setLoading(false)
     }
   }
@@ -250,5 +253,23 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Loading fallback for Suspense
+function LoginLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-purple-950/20 to-gray-950 flex items-center justify-center">
+      <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+    </div>
+  )
+}
+
+// Main page component with Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginContent />
+    </Suspense>
   )
 }
