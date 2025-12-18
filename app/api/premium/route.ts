@@ -1,6 +1,6 @@
 // ============================================================================
 // PREMIUM FEATURES API
-// Advanced analytics and features for paid subscription tiers
+// Subscription management and premium feature access
 // CravCards - CR AudioViz AI, LLC
 // Created: December 17, 2025
 // ============================================================================
@@ -24,7 +24,7 @@ interface SubscriptionTier {
     alerts: number;
     exports_per_month: number;
     api_calls_per_day: number;
-    scan_credits_per_month: number;
+    storage_mb: number;
   };
   badge: string;
   color: string;
@@ -38,15 +38,19 @@ interface UserSubscription {
   current_period_end: string;
   cancel_at_period_end: boolean;
   stripe_subscription_id: string | null;
-  features_used: {
-    cards: number;
-    alerts: number;
-    exports_this_month: number;
-    api_calls_today: number;
-    scans_this_month: number;
-  };
+  stripe_customer_id: string | null;
 }
 
+interface FeatureAccess {
+  feature: string;
+  has_access: boolean;
+  tier_required: string;
+  usage: number;
+  limit: number;
+  upgrade_url: string | null;
+}
+
+// Subscription tiers configuration
 const TIERS: SubscriptionTier[] = [
   {
     id: 'free',
@@ -56,33 +60,32 @@ const TIERS: SubscriptionTier[] = [
     features: [
       'Track up to 100 cards',
       '5 price alerts',
-      'Basic portfolio tracking',
+      'Basic analytics',
       'Community access',
-      '3 card scans per month',
+      'Card scanner (10/month)',
     ],
     limits: {
       cards: 100,
       alerts: 5,
-      exports_per_month: 1,
+      exports_per_month: 2,
       api_calls_per_day: 100,
-      scan_credits_per_month: 3,
+      storage_mb: 50,
     },
-    badge: '🎴',
-    color: 'gray',
+    badge: '🆓',
+    color: '#6B7280',
   },
   {
     id: 'collector',
     name: 'Collector',
-    price_monthly: 4.99,
-    price_yearly: 49.99,
+    price_monthly: 9.99,
+    price_yearly: 99,
     features: [
       'Track up to 1,000 cards',
       '25 price alerts',
-      'Advanced portfolio analytics',
-      'Price history charts',
-      'Set completion tracking',
+      'Advanced analytics',
+      'Portfolio history (1 year)',
+      'Card scanner (100/month)',
       'Export to CSV/PDF',
-      '25 card scans per month',
       'Priority support',
     ],
     limits: {
@@ -90,65 +93,63 @@ const TIERS: SubscriptionTier[] = [
       alerts: 25,
       exports_per_month: 10,
       api_calls_per_day: 1000,
-      scan_credits_per_month: 25,
+      storage_mb: 500,
     },
     badge: '⭐',
-    color: 'blue',
+    color: '#3B82F6',
   },
   {
     id: 'pro',
     name: 'Pro Collector',
-    price_monthly: 9.99,
-    price_yearly: 99.99,
-    features: [
-      'Track up to 10,000 cards',
-      '100 price alerts',
-      'AI market predictions',
-      'Advanced condition grading',
-      'Trade matching',
-      'Public showcase page',
-      'Unlimited exports',
-      '100 card scans per month',
-      'API access',
-      'Priority support',
-    ],
-    limits: {
-      cards: 10000,
-      alerts: 100,
-      exports_per_month: -1, // Unlimited
-      api_calls_per_day: 5000,
-      scan_credits_per_month: 100,
-    },
-    badge: '💎',
-    color: 'purple',
-  },
-  {
-    id: 'dealer',
-    name: 'Dealer',
-    price_monthly: 29.99,
-    price_yearly: 299.99,
+    price_monthly: 24.99,
+    price_yearly: 249,
     features: [
       'Unlimited cards',
       'Unlimited price alerts',
-      'All Pro features',
-      'Inventory management',
-      'Bulk import/export',
-      'Sales tracking',
-      'Customer management',
-      'Invoice generation',
-      'Unlimited scans',
-      'White-label reports',
+      'Full analytics suite',
+      'Portfolio history (all time)',
+      'Unlimited card scanning',
+      'AI grading predictions',
+      'Market predictions',
+      'Trade matching',
+      'API access',
+      'White-label showcase',
       'Dedicated support',
     ],
     limits: {
-      cards: -1, // Unlimited
+      cards: -1, // unlimited
       alerts: -1,
       exports_per_month: -1,
-      api_calls_per_day: 50000,
-      scan_credits_per_month: -1,
+      api_calls_per_day: 10000,
+      storage_mb: 5000,
     },
     badge: '👑',
-    color: 'gold',
+    color: '#8B5CF6',
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price_monthly: 99.99,
+    price_yearly: 999,
+    features: [
+      'Everything in Pro',
+      'Multi-user accounts',
+      'Custom branding',
+      'Dedicated API',
+      'SLA guarantee',
+      'Custom integrations',
+      'Account manager',
+      'Training sessions',
+    ],
+    limits: {
+      cards: -1,
+      alerts: -1,
+      exports_per_month: -1,
+      api_calls_per_day: 100000,
+      storage_mb: 50000,
+    },
+    badge: '🏢',
+    color: '#F59E0B',
   },
 ];
 
@@ -157,27 +158,21 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('user_id');
   const action = searchParams.get('action') || 'tiers';
+  const feature = searchParams.get('feature');
 
   try {
     switch (action) {
       case 'tiers':
         return getTiers();
       case 'subscription':
-        if (!userId) {
-          return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
-        }
-        return getSubscription(userId);
+        if (!userId) return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
+        return await getSubscription(userId);
       case 'check-feature':
-        if (!userId) {
-          return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
-        }
-        const feature = searchParams.get('feature');
-        return checkFeatureAccess(userId, feature);
+        if (!userId || !feature) return NextResponse.json({ success: false, error: 'User ID and feature required' }, { status: 400 });
+        return await checkFeatureAccess(userId, feature);
       case 'usage':
-        if (!userId) {
-          return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
-        }
-        return getUsageStats(userId);
+        if (!userId) return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
+        return await getUsageStats(userId);
       default:
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
@@ -187,29 +182,29 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Subscribe, upgrade, downgrade, or cancel
+// POST - Manage subscriptions
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { user_id, action, tier_id, payment_method } = body;
+    const { user_id, action } = body;
 
     if (!user_id) {
       return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
     }
 
     switch (action) {
-      case 'subscribe':
-        return await subscribe(user_id, tier_id, payment_method);
-      case 'upgrade':
-        return await changeTier(user_id, tier_id, 'upgrade');
-      case 'downgrade':
-        return await changeTier(user_id, tier_id, 'downgrade');
+      case 'create-checkout':
+        return await createCheckoutSession(user_id, body.tier, body.billing_period);
       case 'cancel':
         return await cancelSubscription(user_id);
-      case 'reactivate':
-        return await reactivateSubscription(user_id);
-      case 'use-credit':
-        return await useCredit(user_id, body.credit_type);
+      case 'resume':
+        return await resumeSubscription(user_id);
+      case 'change-tier':
+        return await changeTier(user_id, body.new_tier);
+      case 'apply-promo':
+        return await applyPromoCode(user_id, body.promo_code);
+      case 'record-usage':
+        return await recordUsage(user_id, body.feature, body.amount);
       default:
         return NextResponse.json({ success: false, error: 'Invalid action' }, { status: 400 });
     }
@@ -225,18 +220,18 @@ function getTiers(): NextResponse {
     success: true,
     tiers: TIERS,
     comparison: {
-      headers: ['Feature', 'Free', 'Collector', 'Pro', 'Dealer'],
+      headers: ['Feature', 'Free', 'Collector', 'Pro', 'Enterprise'],
       rows: [
-        ['Cards Tracked', '100', '1,000', '10,000', 'Unlimited'],
-        ['Price Alerts', '5', '25', '100', 'Unlimited'],
-        ['Card Scans/mo', '3', '25', '100', 'Unlimited'],
-        ['Price History', '❌', '✅', '✅', '✅'],
-        ['AI Predictions', '❌', '❌', '✅', '✅'],
-        ['Trade Matching', '❌', '❌', '✅', '✅'],
-        ['Public Showcase', '❌', '❌', '✅', '✅'],
+        ['Card Tracking', '100', '1,000', 'Unlimited', 'Unlimited'],
+        ['Price Alerts', '5', '25', 'Unlimited', 'Unlimited'],
+        ['Card Scanner', '10/mo', '100/mo', 'Unlimited', 'Unlimited'],
+        ['Analytics', 'Basic', 'Advanced', 'Full Suite', 'Full Suite'],
+        ['Portfolio History', '30 days', '1 year', 'All time', 'All time'],
+        ['Exports', '2/mo', '10/mo', 'Unlimited', 'Unlimited'],
         ['API Access', '❌', '❌', '✅', '✅'],
-        ['Inventory Mgmt', '❌', '❌', '❌', '✅'],
-        ['White-label', '❌', '❌', '❌', '✅'],
+        ['Trade Matching', '❌', '❌', '✅', '✅'],
+        ['Market Predictions', '❌', '❌', '✅', '✅'],
+        ['Support', 'Community', 'Email', 'Priority', 'Dedicated'],
       ],
     },
   });
@@ -250,369 +245,303 @@ async function getSubscription(userId: string): Promise<NextResponse> {
     .eq('user_id', userId)
     .single();
 
-  // Get current tier details
-  const tier = TIERS.find(t => t.id === (subscription?.tier || 'free')) || TIERS[0];
-
-  // Get usage
-  const usage = await getUserUsage(userId);
-
-  const sub: UserSubscription = {
-    user_id: userId,
-    tier: subscription?.tier || 'free',
-    status: subscription?.status || 'active',
-    current_period_start: subscription?.current_period_start || new Date().toISOString(),
-    current_period_end: subscription?.current_period_end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-    cancel_at_period_end: subscription?.cancel_at_period_end || false,
-    stripe_subscription_id: subscription?.stripe_subscription_id || null,
-    features_used: usage,
-  };
+  // Default to free tier if no subscription
+  const currentTier = subscription?.tier || 'free';
+  const tierInfo = TIERS.find(t => t.id === currentTier) || TIERS[0];
 
   return NextResponse.json({
     success: true,
-    subscription: sub,
-    tier_details: tier,
-    limits_remaining: {
-      cards: tier.limits.cards === -1 ? 'Unlimited' : Math.max(0, tier.limits.cards - usage.cards),
-      alerts: tier.limits.alerts === -1 ? 'Unlimited' : Math.max(0, tier.limits.alerts - usage.alerts),
-      exports: tier.limits.exports_per_month === -1 ? 'Unlimited' : Math.max(0, tier.limits.exports_per_month - usage.exports_this_month),
-      scans: tier.limits.scan_credits_per_month === -1 ? 'Unlimited' : Math.max(0, tier.limits.scan_credits_per_month - usage.scans_this_month),
+    subscription: subscription || {
+      user_id: userId,
+      tier: 'free',
+      status: 'active',
+      current_period_start: new Date().toISOString(),
+      current_period_end: null,
+      cancel_at_period_end: false,
     },
+    tier_info: tierInfo,
+    is_premium: currentTier !== 'free',
   });
 }
 
-// Check if user can access a feature
-async function checkFeatureAccess(userId: string, feature: string | null): Promise<NextResponse> {
-  if (!feature) {
-    return NextResponse.json({ success: false, error: 'Feature name required' }, { status: 400 });
-  }
-
+// Check feature access
+async function checkFeatureAccess(userId: string, feature: string): Promise<NextResponse> {
+  // Get user's tier
   const { data: subscription } = await supabase
     .from('cv_subscriptions')
     .select('tier')
     .eq('user_id', userId)
     .single();
 
-  const userTier = subscription?.tier || 'free';
-  const tier = TIERS.find(t => t.id === userTier) || TIERS[0];
-
-  // Feature access matrix
-  const featureAccess: Record<string, string[]> = {
-    'price_history': ['collector', 'pro', 'dealer'],
-    'ai_predictions': ['pro', 'dealer'],
-    'trade_matching': ['pro', 'dealer'],
-    'public_showcase': ['pro', 'dealer'],
-    'api_access': ['pro', 'dealer'],
-    'inventory_management': ['dealer'],
-    'bulk_import': ['collector', 'pro', 'dealer'],
-    'unlimited_exports': ['pro', 'dealer'],
-    'white_label': ['dealer'],
-    'advanced_analytics': ['collector', 'pro', 'dealer'],
+  const currentTier = subscription?.tier || 'free';
+  const tierIndex = TIERS.findIndex(t => t.id === currentTier);
+  
+  // Feature requirements mapping
+  const featureRequirements: Record<string, number> = {
+    'unlimited_cards': 2, // Pro
+    'unlimited_alerts': 2,
+    'api_access': 2,
+    'trade_matching': 2,
+    'market_predictions': 2,
+    'advanced_analytics': 1, // Collector
+    'portfolio_history': 1,
+    'priority_support': 1,
+    'export_pdf': 1,
+    'card_scanner_unlimited': 2,
+    'white_label': 2,
+    'multi_user': 3, // Enterprise
+    'custom_branding': 3,
+    'sla_guarantee': 3,
   };
 
-  const allowedTiers = featureAccess[feature] || [];
-  const hasAccess = allowedTiers.includes(userTier);
+  const requiredTierIndex = featureRequirements[feature] ?? 0;
+  const hasAccess = tierIndex >= requiredTierIndex;
+  const requiredTier = TIERS[requiredTierIndex]?.name || 'Free';
 
-  // Find minimum tier required
-  const minTierIndex = TIERS.findIndex(t => allowedTiers.includes(t.id));
-  const minTier = minTierIndex >= 0 ? TIERS[minTierIndex] : null;
+  // Get usage if applicable
+  const usage = await getFeatureUsage(userId, feature);
+  const limit = getFeatureLimit(currentTier, feature);
+
+  const access: FeatureAccess = {
+    feature,
+    has_access: hasAccess && (limit === -1 || usage < limit),
+    tier_required: requiredTier,
+    usage,
+    limit,
+    upgrade_url: hasAccess ? null : '/pricing',
+  };
 
   return NextResponse.json({
     success: true,
-    feature,
-    has_access: hasAccess,
-    user_tier: userTier,
-    required_tier: minTier?.id || 'unknown',
-    upgrade_prompt: !hasAccess && minTier ? {
-      message: `Upgrade to ${minTier.name} to unlock ${feature.replace(/_/g, ' ')}`,
-      tier: minTier.id,
-      price: minTier.price_monthly,
-    } : null,
+    access,
+    current_tier: currentTier,
   });
 }
 
 // Get usage statistics
 async function getUsageStats(userId: string): Promise<NextResponse> {
-  const usage = await getUserUsage(userId);
-  
   const { data: subscription } = await supabase
     .from('cv_subscriptions')
     .select('tier')
     .eq('user_id', userId)
     .single();
 
-  const tier = TIERS.find(t => t.id === (subscription?.tier || 'free')) || TIERS[0];
+  const currentTier = subscription?.tier || 'free';
+  const tierInfo = TIERS.find(t => t.id === currentTier) || TIERS[0];
 
-  return NextResponse.json({
-    success: true,
-    usage,
-    limits: tier.limits,
-    percentages: {
-      cards: tier.limits.cards === -1 ? 0 : (usage.cards / tier.limits.cards * 100),
-      alerts: tier.limits.alerts === -1 ? 0 : (usage.alerts / tier.limits.alerts * 100),
-      exports: tier.limits.exports_per_month === -1 ? 0 : (usage.exports_this_month / tier.limits.exports_per_month * 100),
-      scans: tier.limits.scan_credits_per_month === -1 ? 0 : (usage.scans_this_month / tier.limits.scan_credits_per_month * 100),
-    },
-  });
-}
-
-// Subscribe to a tier
-async function subscribe(userId: string, tierId: string, paymentMethod: string): Promise<NextResponse> {
-  const tier = TIERS.find(t => t.id === tierId);
-  if (!tier) {
-    return NextResponse.json({ success: false, error: 'Invalid tier' }, { status: 400 });
-  }
-
-  // Check if already subscribed
-  const { data: existing } = await supabase
-    .from('cv_subscriptions')
-    .select('tier')
-    .eq('user_id', userId)
-    .single();
-
-  if (existing && existing.tier !== 'free') {
-    return NextResponse.json({
-      success: false,
-      error: 'Already subscribed. Use upgrade/downgrade instead.',
-    }, { status: 400 });
-  }
-
-  // In production: Create Stripe subscription
-  // For now, create local subscription record
-
-  const periodEnd = new Date();
-  periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-  const { data: subscription, error } = await supabase
-    .from('cv_subscriptions')
-    .upsert({
-      user_id: userId,
-      tier: tierId,
-      status: 'active',
-      current_period_start: new Date().toISOString(),
-      current_period_end: periodEnd.toISOString(),
-      payment_method: paymentMethod,
-      created_at: new Date().toISOString(),
-    }, { onConflict: 'user_id' })
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  // Grant badge
-  await grantBadge(userId, tier.badge, tier.name);
-
-  return NextResponse.json({
-    success: true,
-    subscription,
-    message: `Welcome to ${tier.name}! Your subscription is now active.`,
-    tier_details: tier,
-  });
-}
-
-// Change tier (upgrade or downgrade)
-async function changeTier(userId: string, newTierId: string, direction: 'upgrade' | 'downgrade'): Promise<NextResponse> {
-  const newTier = TIERS.find(t => t.id === newTierId);
-  if (!newTier) {
-    return NextResponse.json({ success: false, error: 'Invalid tier' }, { status: 400 });
-  }
-
-  const { data: current } = await supabase
-    .from('cv_subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
-
-  if (!current) {
-    return NextResponse.json({ success: false, error: 'No active subscription' }, { status: 400 });
-  }
-
-  const currentTierIndex = TIERS.findIndex(t => t.id === current.tier);
-  const newTierIndex = TIERS.findIndex(t => t.id === newTierId);
-
-  if (direction === 'upgrade' && newTierIndex <= currentTierIndex) {
-    return NextResponse.json({ success: false, error: 'New tier must be higher for upgrade' }, { status: 400 });
-  }
-
-  if (direction === 'downgrade' && newTierIndex >= currentTierIndex) {
-    return NextResponse.json({ success: false, error: 'New tier must be lower for downgrade' }, { status: 400 });
-  }
-
-  // In production: Prorate and update Stripe subscription
-
-  const { data: subscription, error } = await supabase
-    .from('cv_subscriptions')
-    .update({
-      tier: newTierId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return NextResponse.json({
-    success: true,
-    subscription,
-    message: `Successfully ${direction}d to ${newTier.name}`,
-    tier_details: newTier,
-  });
-}
-
-// Cancel subscription
-async function cancelSubscription(userId: string): Promise<NextResponse> {
-  const { data: subscription, error } = await supabase
-    .from('cv_subscriptions')
-    .update({
-      cancel_at_period_end: true,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return NextResponse.json({
-    success: true,
-    subscription,
-    message: 'Subscription cancelled. You will retain access until the end of your billing period.',
-  });
-}
-
-// Reactivate cancelled subscription
-async function reactivateSubscription(userId: string): Promise<NextResponse> {
-  const { data: subscription, error } = await supabase
-    .from('cv_subscriptions')
-    .update({
-      cancel_at_period_end: false,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  return NextResponse.json({
-    success: true,
-    subscription,
-    message: 'Subscription reactivated! Your subscription will continue.',
-  });
-}
-
-// Use a credit (scan, export, etc.)
-async function useCredit(userId: string, creditType: string): Promise<NextResponse> {
-  const { data: subscription } = await supabase
-    .from('cv_subscriptions')
-    .select('tier')
-    .eq('user_id', userId)
-    .single();
-
-  const tier = TIERS.find(t => t.id === (subscription?.tier || 'free')) || TIERS[0];
-  const usage = await getUserUsage(userId);
-
-  // Check limits
-  let limit = 0;
-  let used = 0;
-  switch (creditType) {
-    case 'scan':
-      limit = tier.limits.scan_credits_per_month;
-      used = usage.scans_this_month;
-      break;
-    case 'export':
-      limit = tier.limits.exports_per_month;
-      used = usage.exports_this_month;
-      break;
-    default:
-      return NextResponse.json({ success: false, error: 'Invalid credit type' }, { status: 400 });
-  }
-
-  if (limit !== -1 && used >= limit) {
-    return NextResponse.json({
-      success: false,
-      error: 'Credit limit reached',
-      limit,
-      used,
-      upgrade_required: true,
-    }, { status: 403 });
-  }
-
-  // Record usage
-  await supabase.from('cv_usage_log').insert({
-    user_id: userId,
-    credit_type: creditType,
-    used_at: new Date().toISOString(),
-  });
-
-  return NextResponse.json({
-    success: true,
-    credit_type: creditType,
-    remaining: limit === -1 ? 'Unlimited' : limit - used - 1,
-  });
-}
-
-// Helper: Get user usage
-async function getUserUsage(userId: string): Promise<UserSubscription['features_used']> {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  // Count cards
+  // Get actual usage
   const { count: cardCount } = await supabase
     .from('cv_user_cards')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId);
 
-  // Count active alerts
   const { count: alertCount } = await supabase
     .from('cv_price_alerts')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('is_active', true);
 
-  // Count exports this month
-  const { count: exportCount } = await supabase
-    .from('cv_exports')
-    .select('*', { count: 'exact', head: true })
+  const { data: monthlyUsage } = await supabase
+    .from('cv_usage_log')
+    .select('feature, amount')
     .eq('user_id', userId)
-    .gte('created_at', startOfMonth.toISOString());
+    .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
-  // Count API calls today
-  const { count: apiCount } = await supabase
-    .from('cv_api_log')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .gte('created_at', startOfDay.toISOString());
+  const exports = monthlyUsage?.filter(u => u.feature === 'export').reduce((sum, u) => sum + u.amount, 0) || 0;
+  const scans = monthlyUsage?.filter(u => u.feature === 'scan').reduce((sum, u) => sum + u.amount, 0) || 0;
 
-  // Count scans this month
-  const { count: scanCount } = await supabase
-    .from('cv_scan_history')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .gte('created_at', startOfMonth.toISOString());
-
-  return {
-    cards: cardCount || 0,
-    alerts: alertCount || 0,
-    exports_this_month: exportCount || 0,
-    api_calls_today: apiCount || 0,
-    scans_this_month: scanCount || 0,
-  };
+  return NextResponse.json({
+    success: true,
+    usage: {
+      cards: { used: cardCount || 0, limit: tierInfo.limits.cards },
+      alerts: { used: alertCount || 0, limit: tierInfo.limits.alerts },
+      exports: { used: exports, limit: tierInfo.limits.exports_per_month },
+      scans: { used: scans, limit: tierInfo.limits.cards === -1 ? -1 : tierInfo.limits.cards * 10 },
+      storage_mb: { used: 0, limit: tierInfo.limits.storage_mb },
+    },
+    tier: currentTier,
+    tier_info: tierInfo,
+  });
 }
 
-// Helper: Grant badge
-async function grantBadge(userId: string, badge: string, tierName: string): Promise<void> {
-  try {
-    await supabase.from('cv_user_badges').insert({
-      user_id: userId,
-      badge,
-      badge_name: `${tierName} Member`,
-      granted_at: new Date().toISOString(),
-    });
-  } catch {
-    // Ignore if badge already exists
+// Create Stripe checkout session
+async function createCheckoutSession(userId: string, tier: string, billingPeriod: 'monthly' | 'yearly'): Promise<NextResponse> {
+  const tierInfo = TIERS.find(t => t.id === tier);
+  
+  if (!tierInfo || tier === 'free') {
+    return NextResponse.json({
+      success: false,
+      error: 'Invalid tier selected',
+    }, { status: 400 });
   }
+
+  // In production, this would create a real Stripe checkout session
+  // For now, return a mock checkout URL
+  const price = billingPeriod === 'yearly' ? tierInfo.price_yearly : tierInfo.price_monthly;
+  
+  return NextResponse.json({
+    success: true,
+    checkout_url: `/checkout?tier=${tier}&period=${billingPeriod}&price=${price}`,
+    tier: tierInfo,
+    billing_period: billingPeriod,
+    price,
+    message: 'Redirect user to checkout URL',
+  });
+}
+
+// Cancel subscription
+async function cancelSubscription(userId: string): Promise<NextResponse> {
+  const { error } = await supabase
+    .from('cv_subscriptions')
+    .update({
+      cancel_at_period_end: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId);
+
+  if (error) throw error;
+
+  return NextResponse.json({
+    success: true,
+    message: 'Subscription will cancel at end of billing period',
+  });
+}
+
+// Resume cancelled subscription
+async function resumeSubscription(userId: string): Promise<NextResponse> {
+  const { error } = await supabase
+    .from('cv_subscriptions')
+    .update({
+      cancel_at_period_end: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId);
+
+  if (error) throw error;
+
+  return NextResponse.json({
+    success: true,
+    message: 'Subscription resumed',
+  });
+}
+
+// Change subscription tier
+async function changeTier(userId: string, newTier: string): Promise<NextResponse> {
+  const tierInfo = TIERS.find(t => t.id === newTier);
+  
+  if (!tierInfo) {
+    return NextResponse.json({
+      success: false,
+      error: 'Invalid tier',
+    }, { status: 400 });
+  }
+
+  // In production, this would handle proration through Stripe
+  const { error } = await supabase
+    .from('cv_subscriptions')
+    .update({
+      tier: newTier,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId);
+
+  if (error) throw error;
+
+  return NextResponse.json({
+    success: true,
+    new_tier: tierInfo,
+    message: `Subscription changed to ${tierInfo.name}`,
+  });
+}
+
+// Apply promo code
+async function applyPromoCode(userId: string, promoCode: string): Promise<NextResponse> {
+  // Check promo code validity
+  const { data: promo } = await supabase
+    .from('cv_promo_codes')
+    .select('*')
+    .eq('code', promoCode.toUpperCase())
+    .eq('is_active', true)
+    .single();
+
+  if (!promo) {
+    return NextResponse.json({
+      success: false,
+      error: 'Invalid or expired promo code',
+    }, { status: 400 });
+  }
+
+  // Check if already used
+  const { data: used } = await supabase
+    .from('cv_promo_usage')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('promo_code', promoCode.toUpperCase())
+    .single();
+
+  if (used) {
+    return NextResponse.json({
+      success: false,
+      error: 'Promo code already used',
+    }, { status: 400 });
+  }
+
+  // Apply promo
+  await supabase.from('cv_promo_usage').insert({
+    user_id: userId,
+    promo_code: promoCode.toUpperCase(),
+    discount_percent: promo.discount_percent,
+    applied_at: new Date().toISOString(),
+  });
+
+  return NextResponse.json({
+    success: true,
+    discount: promo.discount_percent,
+    message: `${promo.discount_percent}% discount applied!`,
+  });
+}
+
+// Record feature usage
+async function recordUsage(userId: string, feature: string, amount: number): Promise<NextResponse> {
+  await supabase.from('cv_usage_log').insert({
+    user_id: userId,
+    feature,
+    amount: amount || 1,
+    created_at: new Date().toISOString(),
+  });
+
+  return NextResponse.json({
+    success: true,
+    message: 'Usage recorded',
+  });
+}
+
+// Helper: Get feature usage
+async function getFeatureUsage(userId: string, feature: string): Promise<number> {
+  const { data } = await supabase
+    .from('cv_usage_log')
+    .select('amount')
+    .eq('user_id', userId)
+    .eq('feature', feature)
+    .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+
+  return data?.reduce((sum, u) => sum + u.amount, 0) || 0;
+}
+
+// Helper: Get feature limit for tier
+function getFeatureLimit(tier: string, feature: string): number {
+  const tierInfo = TIERS.find(t => t.id === tier) || TIERS[0];
+  
+  const limitMapping: Record<string, keyof typeof tierInfo.limits> = {
+    'cards': 'cards',
+    'alerts': 'alerts',
+    'exports': 'exports_per_month',
+    'api_calls': 'api_calls_per_day',
+    'storage': 'storage_mb',
+  };
+
+  const limitKey = limitMapping[feature];
+  return limitKey ? tierInfo.limits[limitKey] : 0;
 }
 
 export const dynamic = 'force-dynamic';
