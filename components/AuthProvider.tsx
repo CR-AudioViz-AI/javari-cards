@@ -105,3 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </AuthContext.Provider>
   );
 }
+
+// Default export for compatibility with layout.tsx
+export default AuthProvider;
