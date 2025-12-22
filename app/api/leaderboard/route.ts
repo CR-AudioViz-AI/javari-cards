@@ -267,6 +267,23 @@ export async function POST(request: NextRequest) {
         .eq('user_id', userId)
         .single();
 
+      // Calculate streak
+      const lastActivity = existing?.last_activity_at ? new Date(existing.last_activity_at) : null;
+      const now = new Date();
+      const daysSinceLastActivity = lastActivity 
+        ? Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+
+      let newStreakDays = existing?.streak_days || 0;
+      let newLongestStreak = existing?.longest_streak || 0;
+
+      if (daysSinceLastActivity === 1) {
+        newStreakDays = (existing?.streak_days || 0) + 1;
+        newLongestStreak = Math.max(newStreakDays, existing?.longest_streak || 0);
+      } else if (daysSinceLastActivity > 1) {
+        newStreakDays = 1;
+      }
+
       const updates = {
         user_id: userId,
         total_xp: (existing?.total_xp || 0) + (xp || 0),
@@ -275,23 +292,11 @@ export async function POST(request: NextRequest) {
         images_submitted: (existing?.images_submitted || 0) + (images || 0),
         trivia_correct: (existing?.trivia_correct || 0) + (trivia_correct || 0),
         trivia_played: (existing?.trivia_played || 0) + (trivia_played || 0),
+        streak_days: newStreakDays,
+        longest_streak: newLongestStreak,
         last_activity_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-
-      // Calculate streak
-      const lastActivity = existing?.last_activity_at ? new Date(existing.last_activity_at) : null;
-      const now = new Date();
-      const daysSinceLastActivity = lastActivity 
-        ? Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24))
-        : 0;
-
-      if (daysSinceLastActivity === 1) {
-        updates.streak_days = (existing?.streak_days || 0) + 1;
-        updates.longest_streak = Math.max(updates.streak_days, existing?.longest_streak || 0);
-      } else if (daysSinceLastActivity > 1) {
-        updates.streak_days = 1;
-      }
 
       const { data, error } = await supabase
         .from('cv_user_stats')
