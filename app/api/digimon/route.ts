@@ -201,21 +201,4 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Available colors for filtering
-export const DIGIMON_COLORS = [
-  'Red',
-  'Blue', 
-  'Yellow',
-  'Green',
-  'Black',
-  'Purple',
-  'White',
-];
 
-// Available card types
-export const DIGIMON_TYPES = [
-  'Digimon',
-  'Digi-Egg',
-  'Option',
-  'Tamer',
-];
