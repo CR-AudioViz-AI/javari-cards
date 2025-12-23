@@ -18,23 +18,28 @@ export async function GET(request: NextRequest) {
     if (!error && data.user) {
       // Check if profile exists, create if not
       const { data: profile } = await supabase
-        .from('cv_profiles')
+        .from('profiles')
         .select('id')
         .eq('id', data.user.id)
         .single()
 
       if (!profile) {
-        // Create profile for OAuth users
-        await supabase.from('cv_profiles').insert({
+        // Create profile in central profiles table for OAuth users
+        await supabase.from('profiles').insert({
           id: data.user.id,
-          user_id: data.user.id,
           email: data.user.email,
-          display_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || data.user.email?.split('@')[0],
+          full_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || data.user.email?.split('@')[0],
           avatar_url: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture ||
             `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data.user.email || 'User')}`,
-          level: 1,
-          xp: 0,
+          role: 'user',
+          is_active: true,
         })
+
+        // Initialize user credits
+        await supabase.from('user_credits').insert({
+          user_id: data.user.id,
+          balance: 100, // Welcome bonus
+        }).catch(() => {}) // Non-critical
       }
 
       // Redirect to dashboard after successful auth
