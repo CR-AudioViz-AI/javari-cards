@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && data.user) {
-      // Check if profile exists, create if not
+      // Check if profile exists in CENTRAL profiles table
       const { data: profile } = await supabase
         .from('profiles')
         .select('id')
@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
         .single()
 
       if (!profile) {
-        // Create profile in central profiles table for OAuth users
+        // Create profile in CENTRAL profiles table for OAuth users
+        // Using correct columns: id, email, full_name, avatar_url, role, is_active
         await supabase.from('profiles').insert({
           id: data.user.id,
           email: data.user.email,
@@ -35,11 +36,13 @@ export async function GET(request: NextRequest) {
           is_active: true,
         })
 
-        // Initialize user credits
+        // Initialize credits in CENTRAL user_credits table
         await supabase.from('user_credits').insert({
           user_id: data.user.id,
           balance: 100, // Welcome bonus
-        }).catch(() => {}) // Non-critical
+        }).catch(() => {
+          // Non-critical - credits can be initialized later
+        })
       }
 
       // Redirect to dashboard after successful auth
