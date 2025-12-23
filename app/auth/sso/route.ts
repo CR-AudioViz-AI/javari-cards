@@ -67,12 +67,14 @@ export async function GET(request: NextRequest) {
         })
 
         // Initialize credits in CENTRAL user_credits table
-        await supabase.from('user_credits').insert({
-          user_id: data.user.id,
-          balance: 100, // Welcome bonus
-        }).catch(() => {
+        try {
+          await supabase.from('user_credits').insert({
+            user_id: data.user.id,
+            balance: 100, // Welcome bonus
+          })
+        } catch {
           // Non-critical - credits can be initialized later
-        })
+        }
       }
 
       // Redirect to intended destination
