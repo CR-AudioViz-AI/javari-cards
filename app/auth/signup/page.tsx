@@ -89,17 +89,16 @@ export default function SignupPage() {
       if (signUpError) throw signUpError
 
       if (authData.user) {
-        // Create profile in cv_profiles table
+        // Create profile in central profiles table
         const { error: profileError } = await supabase
-          .from('cv_profiles')
+          .from('profiles')
           .insert({
             id: authData.user.id,
-            user_id: authData.user.id,
             email: formData.email,
-            display_name: formData.name,
+            full_name: formData.name,
             avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(formData.name)}`,
-            level: 1,
-            xp: 0,
+            role: 'user',
+            is_active: true,
           })
 
         if (profileError) {
@@ -107,7 +106,17 @@ export default function SignupPage() {
           // Don't throw - user is created, profile can be created later
         }
 
-        // Grant welcome achievement
+        // Initialize user credits in central system
+        try {
+          await supabase.from('user_credits').insert({
+            user_id: authData.user.id,
+            balance: 100, // Welcome bonus
+          })
+        } catch {
+          // Credits initialization is non-critical
+        }
+
+        // Grant welcome achievement (CravCards-specific)
         try {
           await supabase.from('cv_user_achievements').insert({
             user_id: authData.user.id,
