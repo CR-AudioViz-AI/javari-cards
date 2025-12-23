@@ -49,22 +49,27 @@ export async function GET(request: NextRequest) {
       // Session established successfully
       // Sync user profile if needed
       const { data: profile } = await supabase
-        .from('cv_profiles')
+        .from('profiles')
         .select('id')
         .eq('id', data.user.id)
         .single()
 
       if (!profile) {
-        // Create profile for this user
-        await supabase.from('cv_profiles').insert({
+        // Create profile in central profiles table for SSO users
+        await supabase.from('profiles').insert({
           id: data.user.id,
           email: data.user.email,
-          username: data.user.email?.split('@')[0] || 'user',
-          display_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'Collector',
+          full_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || 'Collector',
           avatar_url: data.user.user_metadata?.avatar_url || data.user.user_metadata?.picture || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          role: 'user',
+          is_active: true,
         })
+
+        // Initialize user credits
+        await supabase.from('user_credits').insert({
+          user_id: data.user.id,
+          balance: 100, // Welcome bonus
+        }).catch(() => {}) // Non-critical
       }
 
       // Redirect to intended destination
