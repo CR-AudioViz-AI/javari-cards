@@ -546,12 +546,19 @@ export async function voteEnhancement(
 export async function generateReferralCode(userId: string): Promise<string> {
   const code = `REF-${userId.substring(0, 8).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
   
-  // Store in user preferences
+  // Store in user preferences - fetch current, merge, update
+  const { data: profile } = await supabase
+    .from('craiverse_profiles')
+    .select('preferences')
+    .eq('id', userId)
+    .single();
+    
+  const currentPrefs = (profile?.preferences as Record<string, unknown>) || {};
+  const updatedPrefs = { ...currentPrefs, referral_code: code };
+  
   await supabase
     .from('craiverse_profiles')
-    .update({
-      preferences: supabase.sql`preferences || '{"referral_code": "${code}"}'::jsonb`,
-    })
+    .update({ preferences: updatedPrefs })
     .eq('id', userId);
     
   return code;
