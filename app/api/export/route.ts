@@ -371,4 +371,4 @@ function generateSampleExportData(category?: string | null): ExportCard[] {
   return cards;
 }
 
-export const dynamic = 'force-dynamic';
+// DEDUP REMOVED: export const dynamic = 'force-dynamic';

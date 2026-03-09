@@ -435,4 +435,4 @@ function generateSampleShowcases(count: number): Array<Record<string, unknown>> 
   }));
 }
 
-export const dynamic = 'force-dynamic';
+// DEDUP REMOVED: export const dynamic = 'force-dynamic';

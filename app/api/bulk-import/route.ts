@@ -572,4 +572,4 @@ async function lookupCurrentValue(card: ImportCard): Promise<number> {
   return data?.current_price || card.purchase_price || 0;
 }
 
-export const dynamic = 'force-dynamic';
+// DEDUP REMOVED: export const dynamic = 'force-dynamic';

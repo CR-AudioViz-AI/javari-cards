@@ -346,4 +346,4 @@ async function logScan(result: ScanResult): Promise<void> {
   }
 }
 
-export const dynamic = 'force-dynamic';
+// DEDUP REMOVED: export const dynamic = 'force-dynamic';

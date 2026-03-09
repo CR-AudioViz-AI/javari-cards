@@ -341,4 +341,4 @@ function generateSampleListings(category: string | null, count: number): Feature
   return listings;
 }
 
-export const dynamic = 'force-dynamic';
+// DEDUP REMOVED: export const dynamic = 'force-dynamic';

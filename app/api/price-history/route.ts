@@ -242,4 +242,4 @@ function calculatePriceStats(history: { price: number; recorded_at: string }[]):
   };
 }
 
-export const dynamic = 'force-dynamic';
+// DEDUP REMOVED: export const dynamic = 'force-dynamic';

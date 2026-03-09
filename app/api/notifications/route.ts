@@ -522,4 +522,4 @@ function generateSampleNotifications(userId: string): Notification[] {
   ];
 }
 
-export const dynamic = 'force-dynamic';
+// DEDUP REMOVED: export const dynamic = 'force-dynamic';

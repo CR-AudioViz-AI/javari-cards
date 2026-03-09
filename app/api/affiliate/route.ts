@@ -422,4 +422,4 @@ function generateAffiliateUrl(marketplace: string, cardName: string): string {
   }
 }
 
-export const dynamic = 'force-dynamic';
+// DEDUP REMOVED: export const dynamic = 'force-dynamic';

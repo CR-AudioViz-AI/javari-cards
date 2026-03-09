@@ -589,4 +589,4 @@ function generateSampleMatches(card: Record<string, unknown>, limit: number): Tr
   return matches;
 }
 
-export const dynamic = 'force-dynamic';
+// DEDUP REMOVED: export const dynamic = 'force-dynamic';
