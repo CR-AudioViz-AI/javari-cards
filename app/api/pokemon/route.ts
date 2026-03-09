@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const POKEMON_TCG_API = 'https://api.pokemontcg.io/v2';
 const TCGDEX_API = 'https://api.tcgdex.net/v2/en';
 

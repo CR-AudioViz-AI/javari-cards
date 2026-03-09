@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // One Piece card database API (community maintained)
 const ONEPIECE_API = 'https://api.onepiecetcg.info';
 

@@ -10,6 +10,9 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!

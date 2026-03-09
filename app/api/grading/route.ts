@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const GRADING_COMPANIES = {
   PSA: {
     name: 'Professional Sports Authenticator',

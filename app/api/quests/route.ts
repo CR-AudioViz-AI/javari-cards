@@ -7,6 +7,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // Initialize Supabase with fallbacks
 function getSupabaseClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;

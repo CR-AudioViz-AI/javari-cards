@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://cravcards.com';
 
 // POST - Process card image and identify

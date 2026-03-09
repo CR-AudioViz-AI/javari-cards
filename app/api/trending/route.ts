@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // Simulated trending data (in production, this would come from database)
 const TRENDING_CARDS = [
   {

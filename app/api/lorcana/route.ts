@@ -8,6 +8,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const LORCANA_API = 'https://api.lorcana-api.com/cards/all';
 
 // Cache the full card list (it's not that big)

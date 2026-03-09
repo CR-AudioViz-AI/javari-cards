@@ -9,6 +9,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const SPORTSDB_API = 'https://www.thesportsdb.com/api/v1/json/3';
 
 // Initialize Supabase for user-submitted cards

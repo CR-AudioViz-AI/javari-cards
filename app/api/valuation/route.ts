@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // Grading multipliers by company and grade
 const GRADING_MULTIPLIERS: Record<string, Record<string, number>> = {
   PSA: { '10': 5.0, '9': 2.5, '8': 1.5, '7': 1.2, '6': 0.9, '5': 0.6, '4': 0.4, '3': 0.25, '2': 0.15, '1': 0.1 },

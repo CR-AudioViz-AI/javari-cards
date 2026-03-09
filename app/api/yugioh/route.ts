@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const YUGIOH_API = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
 
 interface YuGiOhCard {

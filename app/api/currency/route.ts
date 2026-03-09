@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // Cache exchange rates (refresh every 6 hours)
 let ratesCache: { rates: Record<string, number>; timestamp: number } | null = null;
 const CACHE_DURATION = 6 * 60 * 60 * 1000; // 6 hours

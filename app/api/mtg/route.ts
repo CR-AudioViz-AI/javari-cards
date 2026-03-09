@@ -6,6 +6,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const SCRYFALL_API = 'https://api.scryfall.com';
 
 // Scryfall is 100% FREE with no API key required

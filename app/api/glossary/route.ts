@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const GLOSSARY: Record<string, { term: string; definition: string; category: string; related?: string[] }> = {
   // Grading Terms
   'psa': { term: 'PSA', definition: 'Professional Sports Authenticator - The largest and most popular card grading company, founded in 1991.', category: 'grading', related: ['bgs', 'cgc', 'sgc'] },

@@ -6,6 +6,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const MUSEUM_EXHIBITS = {
   pokemon: {
     title: 'Pokemon Trading Card Game',

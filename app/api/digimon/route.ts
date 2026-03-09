@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 const DIGIMON_API = 'https://digimoncard.io/api-public';
 const API_TIMEOUT = 8000;
 

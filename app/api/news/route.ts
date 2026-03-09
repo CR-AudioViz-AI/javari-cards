@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // Simulated news data (in production would pull from RSS/APIs)
 const CARD_NEWS = [
   {

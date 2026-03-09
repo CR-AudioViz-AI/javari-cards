@@ -8,6 +8,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 interface SearchResult {
   id: string;
   name: string;
