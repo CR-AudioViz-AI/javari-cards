@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // CARD COLLECTOR KNOWLEDGE BASE API
 // Educational content for all card categories
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 interface KnowledgeArticle {
   id: string;

@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // IMAGE QUESTS API - Gamified Card Image Collection
 // CravCards - CR AudioViz AI, LLC
@@ -6,9 +9,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 // Initialize Supabase with fallbacks
 function getSupabaseClient(): SupabaseClient | null {

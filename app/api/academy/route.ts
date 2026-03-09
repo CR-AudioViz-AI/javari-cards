@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // ACADEMY & KNOWLEDGE API - Educational Card Collecting Content
 // CravCards - CR AudioViz AI, LLC
@@ -5,9 +8,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const COURSES = [
   {

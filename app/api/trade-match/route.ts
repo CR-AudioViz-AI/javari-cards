@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // TRADE MATCHING API
 // AI-powered trade suggestions based on wishlists and collections

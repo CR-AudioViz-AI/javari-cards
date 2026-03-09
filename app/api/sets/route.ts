@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // SET CHECKLIST & COMPLETION TRACKING API
 // Track collection completion for card sets
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 // Popular sets data (would be database-driven in production)
 const POPULAR_SETS = {

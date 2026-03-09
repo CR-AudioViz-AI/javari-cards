@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // AFFILIATE INTEGRATION API
 // TCGPlayer, eBay, and other marketplace buy links with commission tracking

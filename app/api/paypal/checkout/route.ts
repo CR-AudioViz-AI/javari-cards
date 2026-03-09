@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+import { NextRequest, NextResponse } from 'next/server';
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
 const PAYPAL_SECRET = process.env.PAYPAL_SECRET;

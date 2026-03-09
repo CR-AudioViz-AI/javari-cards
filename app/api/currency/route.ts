@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // CURRENCY CONVERSION API
 // Free exchange rate conversion for card prices
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 // Cache exchange rates (refresh every 6 hours)
 let ratesCache: { rates: Record<string, number>; timestamp: number } | null = null;

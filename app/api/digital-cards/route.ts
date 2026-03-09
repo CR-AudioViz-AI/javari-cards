@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // app/api/digital-cards/route.ts
 // API endpoints for the Hidden Digital Card System
 

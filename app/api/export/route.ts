@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // COLLECTION EXPORT API
 // Export collection to CSV, PDF, or JSON formats

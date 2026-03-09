@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // ENHANCED AI CARD SCANNER API
 // Advanced image recognition for card identification

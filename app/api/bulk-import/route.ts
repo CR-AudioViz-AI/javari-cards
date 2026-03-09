@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // BULK IMPORT API
 // Import collections from TCGPlayer, eBay, CSV, and other platforms

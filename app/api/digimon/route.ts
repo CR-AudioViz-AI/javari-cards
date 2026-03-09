@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // DIGIMON CARD GAME API - FREE ACCESS TO 2,000+ CARDS
 // CravCards - CR AudioViz AI, LLC
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const DIGIMON_API = 'https://digimoncard.io/api-public';
 const API_TIMEOUT = 8000;

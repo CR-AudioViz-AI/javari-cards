@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // PRICE ALERT NOTIFICATIONS API
 // Push/email notifications when prices hit targets

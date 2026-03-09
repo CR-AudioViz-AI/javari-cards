@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // UNIFIED CARD SEARCH API - ALL TRADING CARD GAMES
 // Pokemon, MTG, Yu-Gi-Oh, Lorcana, Sports, Digimon, One Piece, FAB
@@ -7,9 +10,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 interface SearchResult {
   id: string;

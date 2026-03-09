@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // FLESH AND BLOOD TCG API
 // CravCards - CR AudioViz AI, LLC
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const FAB_API = 'https://api.fabdb.net/cards';
 const API_TIMEOUT = 10000;

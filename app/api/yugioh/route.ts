@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // YU-GI-OH CARD API
 // Free API from ygoprodeck.com - 10,000+ cards with images and prices
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const YUGIOH_API = 'https://db.ygoprodeck.com/api/v7/cardinfo.php';
 

@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // CARD COLLECTING GLOSSARY API
 // Comprehensive terminology for all trading card games
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const GLOSSARY: Record<string, { term: string; definition: string; category: string; related?: string[] }> = {
   // Grading Terms

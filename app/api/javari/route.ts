@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // JAVARI AI - Enhanced Multi-Provider Card Expert
 // CravCards - CR AudioViz AI, LLC
@@ -7,9 +10,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { JAVARI_SYSTEM_PROMPT, CARD_HISTORY, GRADING_KNOWLEDGE, INVESTMENT_STRATEGIES, FAMOUS_CARDS } from '@/lib/javari-knowledge';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 // AI Provider Configuration
 const AI_PROVIDERS = {

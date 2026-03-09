@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // SCRYFALL MTG API - FREE ACCESS TO 27,000+ CARDS
 // CravCards - CR AudioViz AI, LLC
@@ -5,9 +8,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const SCRYFALL_API = 'https://api.scryfall.com';
 

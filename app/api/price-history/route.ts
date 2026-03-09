@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // PRICE HISTORY API
 // Store and retrieve historical price data for any card

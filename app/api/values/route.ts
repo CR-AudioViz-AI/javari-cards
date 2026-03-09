@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // CARD VALUES & PRICE HISTORY API
 // Track card values, price history, and portfolio analytics
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 // Sample price history data (would be from database in production)
 const PRICE_HISTORY = {

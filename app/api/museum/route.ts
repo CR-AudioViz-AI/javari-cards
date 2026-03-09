@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // MUSEUM CONTENT API - Card History & Education
 // CravCards - CR AudioViz AI, LLC
@@ -5,9 +8,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const MUSEUM_EXHIBITS = {
   pokemon: {

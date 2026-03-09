@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // LORCANA CARD API - FIXED
 // Free API from lorcana-api.com - Disney TCG cards
@@ -7,9 +10,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const LORCANA_API = 'https://api.lorcana-api.com/cards/all';
 

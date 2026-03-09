@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // CARD VALUATION CALCULATOR API
 // Estimate card values based on condition, grading, and market data
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 // Grading multipliers by company and grade
 const GRADING_MULTIPLIERS: Record<string, Record<string, number>> = {

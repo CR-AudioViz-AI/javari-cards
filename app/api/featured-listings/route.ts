@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // FEATURED LISTINGS API
 // Marketplace boost options and promoted cards

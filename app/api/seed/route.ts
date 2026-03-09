@@ -1,12 +1,12 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // app/api/seed/route.ts
 // CravCards Database Seed API - One-time initialization endpoint
 // Created: December 12, 2025
 
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

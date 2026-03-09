@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // COLLECTION SHOWCASES API
 // Public profile pages for displaying collections

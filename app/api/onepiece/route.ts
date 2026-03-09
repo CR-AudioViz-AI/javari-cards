@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // ONE PIECE CARD GAME API - FREE ACCESS TO CARDS
 // CravCards - CR AudioViz AI, LLC
@@ -6,9 +9,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 // One Piece card database API (community maintained)
 const ONEPIECE_API = 'https://api.onepiecetcg.info';

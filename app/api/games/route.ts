@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 // ============================================================================
 // GAMES API - Multiple Card Collection Games
 // CravCards - CR AudioViz AI, LLC
@@ -5,9 +8,6 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 
 // Game Definitions
 const GAMES = {
