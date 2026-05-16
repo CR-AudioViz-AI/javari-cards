@@ -1,59 +1,40 @@
-/**
- * CR AudioViz AI - Supabase Client
- * =================================
- * 
- * Universal database client for CR AudioViz AI apps.
- * For authentication, credits, and central services, use:
- * 
- *   import { CentralServices, CentralAuth, CentralCredits } from './central-services';
- * 
- * This client is for app-specific database operations only.
- * Auth, payments, and credits should ALWAYS go through central services.
- */
+// lib/supabase.ts — Platform Standard
+import { createClient as supabaseCreateClient } from '@supabase/supabase-js'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+export const createClient = () => supabaseCreateClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-// Re-export admin utilities from central services
-export { isAdmin, shouldChargeCredits, ADMIN_EMAILS, CentralServices } from './central-services';
+export const supabaseAdmin = supabaseCreateClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  { auth: { persistSession: false } }
+)
 
-// Centralized Supabase configuration
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://kteobfyferrukqeolofj.supabase.co';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0ZW9iZnlmZXJydWtxZW9sb2ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIxOTcyNjYsImV4cCI6MjA3NzU1NzI2Nn0.uy-jlF_z6qVb8qogsNyGDLHqT4HhmdRhLrW7zPv3qhY';
-
-// Standard client for general use
-export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Browser client for auth (SSR-safe singleton pattern)
-let browserClient: SupabaseClient | null = null;
-
-export function createSupabaseBrowserClient(): SupabaseClient {
-  if (typeof window === 'undefined') {
-    // Server-side: return new client each time
-    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-  
-  // Client-side: return singleton
-  if (!browserClient) {
-    browserClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true
-      }
-    });
-  }
-  return browserClient;
+export function createServerClient() {
+  return createServerComponentClient({ cookies })
 }
 
-// Server client for API routes
-export function createSupabaseServerClient(): SupabaseClient {
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) {
-    console.warn('SUPABASE_SERVICE_ROLE_KEY not set, using anon key');
-    return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  }
-  return createClient(SUPABASE_URL, serviceKey);
+export async function getUser(supabase?: ReturnType<typeof createClient>) {
+  const client = supabase ?? createClient()
+  const { data: { user } } = await client.auth.getUser()
+  return user
 }
 
-export { SUPABASE_URL, SUPABASE_ANON_KEY };
-export default supabase;
+export async function getSession(supabase?: ReturnType<typeof createClient>) {
+  const client = supabase ?? createClient()
+  const { data: { session } } = await client.auth.getSession()
+  return session
+}
+
+export function shouldChargeCredits(email?: string | null): boolean {
+  const admins = (process.env.ADMIN_EMAILS ?? 'royhenderson@craudiovizai.com').split(',')
+  return !admins.includes(email ?? '')
+}
+
+export function isAdmin(email?: string | null): boolean {
+  return !shouldChargeCredits(email)
+}
