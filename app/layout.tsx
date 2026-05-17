@@ -5,7 +5,7 @@ import './globals.css'
 
 const inter = { className: 'font-sans' }; // system font fallback
 export const metadata: Metadata = {
-  title: 'CravCards | Premium Trading Card Collection Platform',
+  title: 'Javari Cards | Premium Trading Card Collection Platform',
   description: 'Part of the CR AudioViz AI creative ecosystem',
 }
 
