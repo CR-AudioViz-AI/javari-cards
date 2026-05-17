@@ -1,38 +1,17 @@
-import Script from 'next/script';
-import type { Metadata, Viewport } from 'next'
-// next/font/google removed — use system font stack
+import type { Metadata } from 'next'
 import './globals.css'
-
-const inter = { className: 'font-sans' }; // system font fallback
-export const metadata: Metadata = {
-  title: 'Javari Cards | Premium Trading Card Collection Platform',
-  description: 'Part of the CR AudioViz AI creative ecosystem',
-}
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
-  viewportFit: 'cover',
-}
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export const dynamic = 'force-dynamic'
+export const metadata: Metadata = { title: 'Javari Cards | AI Social Post Generator', description: 'Trading card collection and pricing tracker' }
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <meta name="format-detection" content="telephone=no" />
-      </head>
-      <body className={`${inter.className} min-h-screen min-h-[100dvh]`}>
-        <div className="min-h-screen min-h-[100dvh] bg-gradient-to-br from-gray-50 to-gray-100">
-          {children}
-        </div>
-        <Script src="https://javariai.com/embed.js" strategy="lazyOnload" />
-      </body>
-    </html>
+    <html lang="en"><body style={{ margin: 0, padding: 0, background: '#0a0a0f' }}>
+      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000, background: 'rgba(7,7,16,0.97)', borderBottom: '1px solid rgba(255,255,255,0.06)', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px' }}>
+        <a href="https://craudiovizai.com" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', fontWeight: 800, fontSize: 15, color: '#f59e0b' }}>🤖 Javari Cards</a>
+        <a href="https://craudiovizai.com/auth/signup" style={{ background: 'linear-gradient(135deg,#f59e0b,#8b5cf6)', color: 'white', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Get Started Free</a>
+      </nav>
+      <div style={{ height: 58 }} />{children}
+      <footer style={{ background: '#030308', borderTop: '1px solid rgba(255,255,255,0.04)', padding: '24px', textAlign: 'center', color: '#374151', fontSize: 12 }}>
+        © 2026 CR AudioViz AI, LLC — EIN: 39-3646201</footer>
+    </body></html>
   )
 }
